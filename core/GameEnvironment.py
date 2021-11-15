@@ -1,8 +1,6 @@
 # Game environment class
 
-ARENA = """
-#.              *     #
-"""
+ARENA = """#.              *     #"""
 
 START = '.'
 TARGET = '*'
@@ -67,6 +65,10 @@ class GameEnvironment:
         return self.__target_pos
 
     @property
+    def target(self):
+        return self.__target
+
+    @property
     def states(self):
         return self.__states.keys()
 
@@ -76,10 +78,10 @@ class GameEnvironment:
 
     def is_near_target(self, state, states):
         if state[1] < len(ARENA) - 1:
-            if states[state[0], state[1] + 1] == TARGET:
+            if states[(state[0], state[1] + 1)] == TARGET:
                 return True
         if state[1] >= 1:
-            if states[state[0], state[1] - 1] == TARGET:
+            if states[(state[0], state[1] - 1)] == TARGET:
                 return True
         return False
 
@@ -89,12 +91,13 @@ class GameEnvironment:
         state = agent.state
         if action == LEFT:
             new_state = (state[0], state[1] - 1)
-        if action == RIGHT:
+        elif action == RIGHT:
             new_state = (state[0], state[1] + 1)
-
+        else:
+            new_state = state
         # Calcul recompense agent et lui transmettre
         if new_state in self.__states:
-            if self.__states[new_state] in [WALL, TARGET]:
+            if self.__states[new_state] in [WALL, TARGET] or new_state[1] > len(ARENA) or new_state[1] < 0:
                 reward = REWARD_OUT
             elif action == PUNCH and self.is_near_target(state, self.__states):
                 reward = REWARD_WOUND_TARGET
@@ -103,7 +106,7 @@ class GameEnvironment:
                 reward = REWARD_BLOCK
             else:
                 reward = REWARD_EMPTY
-            if not self.__target.is_alive:
+            if not self.target.is_alive:
                 reward = REWARD_KILL_TARGET
             state = new_state
         else:
@@ -175,7 +178,7 @@ if __name__ == '__main__':
     while agent.state != env.goal:
         iteration += 1
         action = agent.best_action()
-        # print(action)
+
         reward = env.apply(agent, action)
         print(iteration, agent.state, agent.score, reward)
         # print(agent.qtable)
