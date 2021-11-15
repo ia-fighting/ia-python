@@ -24,6 +24,7 @@ PUNCH = 'P'
 BLOCK = 'B'
 ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
 
+
 class Target:
     def __init__(self, health):
         self.__health = health
@@ -34,11 +35,17 @@ class Target:
     def _set_health(self, health):
         self.__health = health
 
+    def is_alive(self):
+        if self.__health <= 0:
+            return False
+        return True
+
     name = property(_get_health, _set_health)
 
-class Game:
-    def __init__(self, agent, text_arena):
-        self.agent = agent
+
+class GameEnvironment:
+    def __init__(self, target, text_arena):
+        self.__target = target
         self.__states = {}
 
         # Environment parsing
@@ -47,7 +54,7 @@ class Game:
             for col in range(len(lines[row])):
                 self.__states[(row, col)] = lines[row][col]
                 if lines[row][col] == TARGET:
-                    self.__target = (row, col)
+                    self.__target_pos = (row, col)
                 if lines[row][col] == START:
                     self.__start = (row, col)
 
@@ -56,12 +63,16 @@ class Game:
         return self.__start
 
     @property
-    def target(self):
-        return self.__target
+    def target_pos(self):
+        return self.__target_pos
 
     @property
     def states(self):
         return self.__states.keys()
+
+    @property
+    def goal(self):
+        return not self.target.is_alive
 
     # Appliquer une action sur l'environnement
     # On met à jour l'état de l'agent, on lui donne sa récompense
@@ -72,7 +83,7 @@ class Game:
         if action == RIGHT:
             new_state = (state[0], state[1] + 1)
 
-        #should not be inf or sup to the arena size
+        # should not be inf or sup to the arena size
         right_state = (state[0], state[1] + 2)
         left_state = (state[0], state[1] - 2)
         # Calcul recompense agent et lui transmettre
@@ -81,18 +92,18 @@ class Game:
                 reward = REWARD_OUT
             elif self.__states[right_state] == TARGET and action == PUNCH:
                 reward = REWARD_WOUND_TARGET
-                #target health - 20
+                self.target.health -= 20
             elif self.__states[left_state] == TARGET and action == PUNCH:
                 reward = REWARD_WOUND_TARGET
-                # target health - 20
+                self.target.health -= 20
             elif action == BLOCK:
                 reward = REWARD_BLOCK
             else:
                 reward = REWARD_EMPTY
-            #if target health <= 0 : reward kill
+            if not self.target.is_alive:
+                reward = REWARD_KILL_TARGET
             state = new_state
         else:
             reward = REWARD_OUT
         agent.update(action, state, reward)
         return reward
-
