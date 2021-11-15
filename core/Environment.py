@@ -24,6 +24,17 @@ PUNCH = 'P'
 BLOCK = 'B'
 ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
 
+class Target:
+    def __init__(self, health):
+        self.__health = health
+
+    def _get_health(self):
+        return self.__health
+
+    def _set_health(self, health):
+        self.__health = health
+
+    name = property(_get_health, _set_health)
 
 class Game:
     def __init__(self, agent, text_arena):
@@ -84,6 +95,4 @@ class Game:
             reward = REWARD_OUT
         agent.update(action, state, reward)
         return reward
-
-
 
