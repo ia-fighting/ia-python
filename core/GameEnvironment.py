@@ -74,7 +74,7 @@ class GameEnvironment:
 
     @property
     def goal(self):
-        return not self.__target.is_alive
+        return not self.__target.is_alive()
 
     def is_near_target(self, state, states):
         if state[1] < len(ARENA) - 1:
@@ -101,12 +101,12 @@ class GameEnvironment:
                 reward = REWARD_OUT
             elif action == PUNCH and self.is_near_target(state, self.__states):
                 reward = REWARD_WOUND_TARGET
-                self.target.health -= 20
+                self.target._set_health(self.target._get_health() - 20)
             elif action == BLOCK:
                 reward = REWARD_BLOCK
             else:
                 reward = REWARD_EMPTY
-            if not self.target.is_alive:
+            if not self.target.is_alive():
                 reward = REWARD_KILL_TARGET
             state = new_state
         else:
@@ -175,7 +175,7 @@ if __name__ == '__main__':
 
     # for i in range(3):
     iteration = 0
-    while agent.state != env.goal:
+    while not env.goal:
         iteration += 1
         action = agent.best_action()
 
@@ -184,14 +184,3 @@ if __name__ == '__main__':
         # print(agent.qtable)
 
     agent.reset(env)
-
-    print()
-
-    iteration = 0
-    while agent.state != env.goal:
-        iteration += 1
-        action = agent.best_action()
-        print(action)
-        reward = env.apply(agent, action)
-        print(iteration, agent.state, agent.score, reward)
-        # print(agent.qtable)
