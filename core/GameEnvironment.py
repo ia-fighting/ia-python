@@ -38,12 +38,13 @@ class Target:
             return False
         return True
 
-    name = property(_get_health, _set_health)
+    health = property(_get_health, _set_health)
 
 
 class GameEnvironment:
     def __init__(self, target, text_arena):
         self.__target = target
+        self.__target_start = Target(target.health)
         self.__states = {}
 
         # Environment parsing
@@ -64,9 +65,17 @@ class GameEnvironment:
     def target_pos(self):
         return self.__target_pos
 
-    @property
-    def target(self):
+    def _get_target(self):
         return self.__target
+
+    def _set_target(self, target):
+        self.__target = target
+
+    target = property(_get_target, _set_target)
+
+    @property
+    def target_start(self):
+        return self.__target_start
 
     @property
     def states(self):
@@ -101,7 +110,7 @@ class GameEnvironment:
                 reward = REWARD_OUT
             elif action == PUNCH and self.is_near_target(state, self.__states):
                 reward = REWARD_WOUND_TARGET
-                self.target._set_health(self.target._get_health() - 20)
+                self.target.health -= 20
             elif action == BLOCK:
                 reward = REWARD_BLOCK
             else:
@@ -113,6 +122,7 @@ class GameEnvironment:
             reward = REWARD_OUT
         agent.update(action, state, reward)
         return reward
+
 
 class Agent:
     def __init__(self, environment):
@@ -135,7 +145,7 @@ class Agent:
         DISCOUNT_FACTOR = 0.5
 
         self.__qtable[self.__state][action] += LEARNING_RATE * \
-                        (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][action])
+                                               (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][action])
 
         self.__state = new_state
         self.__score += reward
@@ -164,6 +174,7 @@ class Agent:
 
     def reset(self, environment):
         self.__state = environment.start
+        environment.target = Target(environment.target_start.health)
 
 
 if __name__ == '__main__':
@@ -173,7 +184,6 @@ if __name__ == '__main__':
 
     agent = Agent(env)
 
-    # for i in range(3):
     iteration = 0
     while not env.goal:
         iteration += 1
@@ -184,3 +194,13 @@ if __name__ == '__main__':
         # print(agent.qtable)
 
     agent.reset(env)
+
+    iteration = 0
+    print()
+
+    while not env.goal:
+        iteration += 1
+        action = agent.best_action()
+
+        reward = env.apply(agent, action)
+        print(iteration, agent.state, agent.score, reward)
