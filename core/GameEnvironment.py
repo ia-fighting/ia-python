@@ -1,5 +1,6 @@
 # Game environment class
 import time
+from utils.Singleton import Singleton
 import os
 
 ARENA = """#.              *     #"""
@@ -41,8 +42,7 @@ class Target:
 
     health = property(_get_health, _set_health)
 
-
-class GameEnvironment:
+class GameEnvironment(Singleton):
     def __init__(self, target, text_arena):
         self.__target = target
         self.__target_start = Target(target.health)
@@ -140,7 +140,6 @@ class GameEnvironment:
                 print()
         print()
 
-
 class Agent:
     def __init__(self, environment, health):
         self.__state = environment.start
@@ -227,3 +226,5 @@ if __name__ == '__main__':
                 time.sleep(0.2)
                 env.display(agent.state, i, iteration,
                     len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
+
+
