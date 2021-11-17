@@ -88,30 +88,41 @@ class GameEnvironment(Singleton):
             if agent.state == state:
                 return agent
 
+    def attack_near_players(self, new_state):
+        reward = 0
+        for agent in self.__players:
+            if agent.state == (new_state[0], new_state[1] - 1) \
+                    or agent.state == (new_state[0], new_state[1] + 1):
+                if agent.actual_action != BLOCK:
+                    agent.health -= 20
+                    reward += REWARD_BEING_TOUCH
+                    if agent.health <= 0:
+                        self.__players.remove(agent)
+                        reward += REWARD_KILL_TARGET
+                else:
+                    reward += REWARD_TOUCH_EMPTY
+        return reward
+
     # Appliquer une action sur l'environnement
     # On met à jour l'état de l'agent, on lui donne sa récompense
-    def apply(self, agent, action):
+    def apply(self, agent):
         state = agent.state
+        action = agent.actual_action
         new_state = self.moving_agent(state, action)
         # Calcul recompense agent et lui transmettre
         if new_state in self.__states:
             if self.__states[new_state] in [WALL, PLAYER] or new_state[1] > len(ARENA) or new_state[1] < 0:
                 reward = REWARD_OUT
             elif action == PUNCH and self.is_near_players(state, self.__states):
-                reward = REWARD_WOUND_TARGET
-                #fetch player
-                self.target.health -= 20
+                reward = self.attack_near_players(new_state)
             elif action == BLOCK:
                 reward = REWARD_BLOCK
             else:
                 reward = REWARD_EMPTY
-                #TODO
-            if not self.target.is_alive():
-                reward = REWARD_KILL_TARGET
             state = new_state
         else:
             reward = REWARD_OUT
-        agent.update(action, state, reward)
+        agent.update(state, reward)
         return reward
 
     def display(self, position, generation, iteration, width):
@@ -132,12 +143,13 @@ class GameEnvironment(Singleton):
 
 
 class Agent:
-    def __init__(self, environment, health):
-        self.__state = environment.start
+    def __init__(self, environment, health, position):
+        self.__state = position
         self.__score = 0
         self.__last_action = None
         self.__qtable = {}
         self.__health = health
+        self.__actual_action = None
 
         # QTable initialization
         for s in environment.states:
@@ -151,26 +163,36 @@ class Agent:
     def _set_health(self, health):
         self.__health = health
 
+    health = property(_get_health, _set_health)
+
     def is_alive(self):
         if self.__health <= 0:
             return False
         return True
 
-    health = property(_get_health, _set_health)
+    def _get_actual_action(self):
+        return self.__actual_action
 
-    def update(self, action, new_state, reward):
+    def _set_actual_action(self, actual_action):
+        self.__actual_action = actual_action
+
+    actual_action = property(_get_actual_action, _set_actual_action)
+
+
+    def update(self, new_state, reward):
         # QTable update
         # Q(s, a) <- Q(s, a) + learning_rate * [reward + discount_factor * max(qtable[a]) - Q(s, a)]
         maxQ = max(self.__qtable[new_state].values())
         LEARNING_RATE = 1
         DISCOUNT_FACTOR = 0.5
 
-        self.__qtable[self.__state][action] += LEARNING_RATE * \
-                                               (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][action])
+        self.__qtable[self.__state][self.actual_action] += LEARNING_RATE * \
+                                               (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][self.actual_action])
 
         self.__state = new_state
         self.__score += reward
-        self.__last_action = action
+        self.__last_action = self.actual_action
+        self.__actual_action = None
 
     # Best action who maximise reward
     def best_action(self):
@@ -179,7 +201,8 @@ class Agent:
         for a in possible_rewards:
             if best is None or possible_rewards[a] > possible_rewards[best]:
                 best = a
-        return best
+                self.__actual_action = best
+                print(best)
 
     @property
     def state(self):
@@ -203,7 +226,7 @@ class AgentManager:
         self.__population = population
         self.__agents = []
         for i in range(population):
-            self.__agents.append(Agent(self.__environment, health))
+            self.__agents.append(Agent(self.__environment, health, self.__environment.players_pos[i]))
 
     # Verify if all agents are alive
     def is_only_one_agent_alive(self):
@@ -235,23 +258,23 @@ class AgentManager:
 
     # Best action for each agent
     def best_actions(self):
-        best_actions = []
         for a in self.__agents:
             if a.is_alive():
-                best_actions.append(a.best_action())
-        return best_actions
+                a.best_action()
 
-    def apply_actions(self, agents, actions):
+    def apply_actions(self, agents):
         # Apply moving actions
         for i in range(len(agents)):
-            if agents[i].is_alive():
-                if actions[i] in MOVING_ACTIONS:
-                    self.__environment.apply(agents[i], actions[i])
+            agent = agents[i]
+            if agent.is_alive():
+                if agent.actual_action in MOVING_ACTIONS:
+                    self.__environment.apply(agents[i])
         # Apply others actions
         for i in range(len(agents)):
+            agent = agents[i]
             if agents[i].is_alive():
-                if actions[i] not in MOVING_ACTIONS:
-                    self.__environment.apply(agents[i], actions[i])
+                if agent.actual_action not in MOVING_ACTIONS:
+                    self.__environment.apply(agents[i])
 
 
 if __name__ == '__main__':
@@ -266,5 +289,6 @@ if __name__ == '__main__':
         iteration = 0
         while not am.goal:
             iteration += 1
-            actions = am.best_actions()
-            am.apply_actions(am.get_alive_agents, actions)
+            am.best_actions()
+            am.apply_actions(am.get_alive_agents)
+        print(i)
