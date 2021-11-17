@@ -142,17 +142,31 @@ class GameEnvironment:
 
 
 class Agent:
-    def __init__(self, environment):
+    def __init__(self, environment, health):
         self.__state = environment.start
         self.__score = 0
         self.__last_action = None
         self.__qtable = {}
+        self.__health = health
 
         # QTable initialization
         for s in environment.states:
             self.__qtable[s] = {}
             for a in ACTIONS:
                 self.__qtable[s][a] = 0.0
+
+    def _get_health(self):
+        return self.__health
+
+    def _set_health(self, health):
+        self.__health = health
+
+    def is_alive(self):
+        if self.__health <= 0:
+            return False
+        return True
+
+    health = property(_get_health, _set_health)
 
     def update(self, action, new_state, reward):
         # QTable update
@@ -199,7 +213,7 @@ if __name__ == '__main__':
     env = GameEnvironment(target, ARENA)
     print(env.states)
 
-    agent = Agent(env)
+    agent = Agent(env, 60)
 
     for i in range(100):
         print('GEN: ', i)
