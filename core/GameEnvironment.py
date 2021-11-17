@@ -125,16 +125,21 @@ class GameEnvironment(Singleton):
         agent.update(action, state, reward)
         return reward
 
-    def display(self, position, generation, iteration, width):
+    def display(self, generation, iteration, width):
         os.system('cls')
         incr = 0
         print('GEN: ', generation)
         print("ITERATION: ", iteration)
         print()
+        players_states = []
+        for player in self.players:
+            players_states.append(player.state)
         for s in self.__states:
             incr += 1
-            if position == s:
+            if s in players_states:
                 print('P', end='')
+            elif self.__states[s] == PLAYER:
+                print('', end='')
             else:
                 print(self.__states[s], end='')
             if incr % width == 0:
@@ -226,6 +231,7 @@ class AgentManager:
         self.__agents = []
         for i in range(population):
             self.__agents.append(Agent(self.__environment, health, self.__environment.players_pos[i]))
+            self.__environment.players = self.__agents
 
     # Verify if all agents are alive
     def is_only_one_agent_alive(self):
@@ -265,6 +271,8 @@ class AgentManager:
         # Apply moving actions
         for i in range(len(agents)):
             agent = agents[i]
+            print('Agent ', i, ' action :', agent.actual_action)
+            print('Agent ', i, ' health :', agent.health)
             if agent.is_alive():
                 if agent.actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
@@ -283,11 +291,13 @@ if __name__ == '__main__':
     am = AgentManager(env, 2, 80)
     print(env.states)
 
-    for i in range(100):
+    for i in range(1):
         print('GEN: ', i)
         iteration = 0
         while not am.goal:
             iteration += 1
             am.best_actions()
             am.apply_actions(am.get_alive_agents)
-        print(i)
+            if (i == 0):
+                time.sleep(0.3)
+                env.display(i, iteration, len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
