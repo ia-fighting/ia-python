@@ -3,10 +3,11 @@ import time
 from utils.Singleton import Singleton
 import os
 
-ARENA = """#.              *     #"""
+ARENA = """#*              *     #"""
 
-START = '.'
-TARGET = '*'
+#TODO: QUESTION mettre plusieurs joueurs sur la map
+
+PLAYER = '*'
 WALL = '#'
 
 # Rewards
@@ -24,98 +25,87 @@ LEFT = 'L'
 PUNCH = 'P'
 BLOCK = 'B'
 ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
+MOVING_ACTIONS = [RIGHT, LEFT]
 
-class Target:
-    def __init__(self, health):
-        self.__health = health
-
-    def _get_health(self):
-        return self.__health
-
-    def _set_health(self, health):
-        self.__health = health
-
-    def is_alive(self):
-        if self.__health <= 0:
-            return False
-        return True
-
-    health = property(_get_health, _set_health)
 
 class GameEnvironment(Singleton):
-    def __init__(self, target, text_arena):
-        self.__target = target
-        self.__target_start = Target(target.health)
+    def __init__(self, text_arena):
         self.__states = {}
+        self.__players_pos = []
+        self.__players = []
 
         # Environment parsing
         lines = list(map(lambda x: x.strip(), text_arena.strip().split('\n')))
         for row in range(len(lines)):
             for col in range(len(lines[row])):
                 self.__states[(row, col)] = lines[row][col]
-                if lines[row][col] == TARGET:
-                    self.__target_pos = (row, col)
-                if lines[row][col] == START:
-                    self.__start = (row, col)
+                if lines[row][col] == PLAYER:
+                    self.__players_pos.append((row, col))
+        self.__players_pos_start = self.__players_pos.copy()
+
 
     @property
-    def start(self):
-        return self.__start
+    def players_pos(self):
+        return self.__players_pos
+
+    def _get_players(self):
+        return self.__players
+
+    def _set_players(self, players):
+        self.__players = players
+
+    players = property(_get_players, _set_players)
 
     @property
-    def target_pos(self):
-        return self.__target_pos
-
-    def _get_target(self):
-        return self.__target
-
-    def _set_target(self, target):
-        self.__target = target
-
-    target = property(_get_target, _set_target)
-
-    @property
-    def target_start(self):
-        return self.__target_start
+    def players_pos_start(self):
+        return self.__players_pos_start
 
     @property
     def states(self):
         return self.__states.keys()
 
-    @property
-    def goal(self):
-        return not self.__target.is_alive()
-
-    def is_near_target(self, state, states):
+    def is_near_players(self, state, states):
         if state[1] < len(ARENA) - 1:
-            if states[(state[0], state[1] + 1)] in [TARGET]:
+            if (state[0], state[1] + 1) in self.players_pos:
                 return True
         if state[1] >= 1:
-            if states[(state[0], state[1] - 1)] in [TARGET]:
+            if (state[0], state[1] - 1) in self.players_pos:
                 return True
         return False
 
-    # Appliquer une action sur l'environnement
-    # On met à jour l'état de l'agent, on lui donne sa récompense
-    def apply(self, agent, action):
-        state = agent.state
+    def moving_agent(self, state, action):
         if action == LEFT:
             new_state = (state[0], state[1] - 1)
         elif action == RIGHT:
             new_state = (state[0], state[1] + 1)
         else:
             new_state = state
+        return new_state
+
+    # fetch agent at position
+    def get_agent(self, state):
+        for agent in self.__players:
+            if agent.state == state:
+                return agent
+
+    # Appliquer une action sur l'environnement
+    # On met à jour l'état de l'agent, on lui donne sa récompense
+    def apply(self, agent, action):
+        state = agent.state
+        new_state = self.moving_agent(state, action)
         # Calcul recompense agent et lui transmettre
         if new_state in self.__states:
-            if self.__states[new_state] in [WALL, TARGET] or new_state[1] > len(ARENA) or new_state[1] < 0:
+            if self.__states[new_state] in [WALL, PLAYER] or new_state[1] > len(ARENA) or new_state[1] < 0:
                 reward = REWARD_OUT
-            elif action == PUNCH and self.is_near_target(state, self.__states):
+            elif action == PUNCH and self.is_near_players(state, self.__states):
                 reward = REWARD_WOUND_TARGET
+                #fetch player
                 self.target.health -= 20
             elif action == BLOCK:
                 reward = REWARD_BLOCK
             else:
                 reward = REWARD_EMPTY
+                #TODO
             if not self.target.is_alive():
                 reward = REWARD_KILL_TARGET
             state = new_state
@@ -139,6 +129,7 @@ class GameEnvironment(Singleton):
             if incr % width == 0:
                 print()
         print()
+
 
 class Agent:
     def __init__(self, environment, health):
@@ -204,27 +195,76 @@ class Agent:
 
     def reset(self, environment):
         self.__state = environment.start
-        environment.target = Target(environment.target_start.health)
+
+
+class AgentManager:
+    def __init__(self, environment, population, health):
+        self.__environment = environment
+        self.__population = population
+        self.__agents = []
+        for i in range(population):
+            self.__agents.append(Agent(self.__environment, health))
+
+    # Verify if all agents are alive
+    def is_only_one_agent_alive(self):
+        count = 0
+        for a in self.__agents:
+            if a.is_alive():
+                count += 1
+        # if count superior to 1, there is more than one agent alive
+        if count > 1:
+            return False
+        return True
+
+    @property
+    def get_agents(self):
+        return self.__agents
+
+    # get all alive agents
+    @property
+    def get_alive_agents(self):
+        alive_agents = []
+        for a in self.__agents:
+            if a.is_alive():
+                alive_agents.append(a)
+        return alive_agents
+
+    @property
+    def goal(self):
+        return self.is_only_one_agent_alive()
+
+    # Best action for each agent
+    def best_actions(self):
+        best_actions = []
+        for a in self.__agents:
+            if a.is_alive():
+                best_actions.append(a.best_action())
+        return best_actions
+
+    def apply_actions(self, agents, actions):
+        # Apply moving actions
+        for i in range(len(agents)):
+            if agents[i].is_alive():
+                if actions[i] in MOVING_ACTIONS:
+                    self.__environment.apply(agents[i], actions[i])
+        # Apply others actions
+        for i in range(len(agents)):
+            if agents[i].is_alive():
+                if actions[i] not in MOVING_ACTIONS:
+                    self.__environment.apply(agents[i], actions[i])
 
 
 if __name__ == '__main__':
-    target = Target(60)
-    env = GameEnvironment(target, ARENA)
-    print(env.states)
+    env = GameEnvironment(ARENA)
 
-    agent = Agent(env, 60)
+    # initialize AgentManager
+    am = AgentManager(env, 2, 80)
+    print(env.states)
 
     for i in range(100):
         print('GEN: ', i)
-        agent.reset(env)
         iteration = 0
-        while not env.goal:
+        while not am.goal:
             iteration += 1
-            action = agent.best_action()
-            reward = env.apply(agent, action)
-            if (i == 99):
-                time.sleep(0.2)
-                env.display(agent.state, i, iteration,
-                    len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
-
-
+            actions = am.best_actions()
+            am.apply_actions(am.get_alive_agents, actions)
