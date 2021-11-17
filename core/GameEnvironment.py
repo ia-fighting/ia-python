@@ -122,7 +122,7 @@ class GameEnvironment(Singleton):
             state = new_state
         else:
             reward = REWARD_OUT
-        agent.update(state, reward)
+        agent.update(action, state, reward)
         return reward
 
     def display(self, position, generation, iteration, width):
@@ -179,15 +179,15 @@ class Agent:
     actual_action = property(_get_actual_action, _set_actual_action)
 
 
-    def update(self, new_state, reward):
+    def update(self, action, new_state, reward):
         # QTable update
         # Q(s, a) <- Q(s, a) + learning_rate * [reward + discount_factor * max(qtable[a]) - Q(s, a)]
         maxQ = max(self.__qtable[new_state].values())
         LEARNING_RATE = 1
         DISCOUNT_FACTOR = 0.5
 
-        self.__qtable[self.__state][self.actual_action] += LEARNING_RATE * \
-                                               (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][self.actual_action])
+        self.__qtable[self.__state][action] += LEARNING_RATE * \
+                                               (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][action])
 
         self.__state = new_state
         self.__score += reward
@@ -202,7 +202,6 @@ class Agent:
             if best is None or possible_rewards[a] > possible_rewards[best]:
                 best = a
                 self.__actual_action = best
-                print(best)
 
     @property
     def state(self):
@@ -273,8 +272,8 @@ class AgentManager:
         for i in range(len(agents)):
             agent = agents[i]
             if agents[i].is_alive():
-                if agent.actual_action not in MOVING_ACTIONS:
-                    self.__environment.apply(agents[i])
+                if agent.actual_action not in MOVING_ACTIONS and agent.actual_action is not None:
+                    self.__environment.apply(agent)
 
 
 if __name__ == '__main__':
