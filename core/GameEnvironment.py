@@ -1,4 +1,6 @@
 # Game environment class
+import time
+import os
 
 ARENA = """#.              *     #"""
 
@@ -21,7 +23,6 @@ LEFT = 'L'
 PUNCH = 'P'
 BLOCK = 'B'
 ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
-
 
 class Target:
     def __init__(self, health):
@@ -123,6 +124,22 @@ class GameEnvironment:
         agent.update(action, state, reward)
         return reward
 
+    def display(self, position, generation, iteration, width):
+        os.system('cls')
+        incr = 0
+        print('GEN: ', generation)
+        print("ITERATION: ", iteration)
+        print()
+        for s in self.__states:
+            incr += 1
+            if position == s:
+                print('P', end='')
+            else:
+                print(self.__states[s], end='')
+            if incr % width == 0:
+                print()
+        print()
+
 
 class Agent:
     def __init__(self, environment):
@@ -184,23 +201,15 @@ if __name__ == '__main__':
 
     agent = Agent(env)
 
-    iteration = 0
-    while not env.goal:
-        iteration += 1
-        action = agent.best_action()
-
-        reward = env.apply(agent, action)
-        print(iteration, agent.state, agent.score, reward)
-        # print(agent.qtable)
-
-    agent.reset(env)
-
-    iteration = 0
-    print()
-
-    while not env.goal:
-        iteration += 1
-        action = agent.best_action()
-
-        reward = env.apply(agent, action)
-        print(iteration, agent.state, agent.score, reward)
+    for i in range(100):
+        print('GEN: ', i)
+        agent.reset(env)
+        iteration = 0
+        while not env.goal:
+            iteration += 1
+            action = agent.best_action()
+            reward = env.apply(agent, action)
+            if (i == 99):
+                time.sleep(0.2)
+                env.display(agent.state, i, iteration,
+                    len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
