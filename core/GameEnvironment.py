@@ -87,10 +87,10 @@ class GameEnvironment:
 
     def is_near_target(self, state, states):
         if state[1] < len(ARENA) - 1:
-            if states[(state[0], state[1] + 1)] == TARGET:
+            if states[(state[0], state[1] + 1)] in [TARGET]:
                 return True
         if state[1] >= 1:
-            if states[(state[0], state[1] - 1)] == TARGET:
+            if states[(state[0], state[1] - 1)] in [TARGET]:
                 return True
         return False
 
