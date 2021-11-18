@@ -3,7 +3,7 @@ import time
 from utils.Singleton import Singleton
 import os
 
-ARENA = """#*              *     #"""
+ARENA = """#*           *#"""
 
 #TODO: QUESTION mettre plusieurs joueurs sur la map
 
@@ -14,10 +14,10 @@ WALL = '#'
 REWARD_OUT = -25
 REWARD_EMPTY = -1
 REWARD_BLOCK = -5
-REWARD_WOUND_TARGET = 10
+REWARD_WOUND_TARGET = 30
 REWARD_KILL_TARGET = 100
 REWARD_BEING_TOUCH = -20
-REWARD_TOUCH_EMPTY = -3
+REWARD_TOUCH_EMPTY = -2
 
 # Possible actions
 RIGHT = 'R'
@@ -64,7 +64,7 @@ class GameEnvironment(Singleton):
     def states(self):
         return self.__states.keys()
 
-    def is_near_players(self, state, states):
+    def is_near_players(self, state):
         if state[1] < len(ARENA) - 1:
             if (state[0], state[1] + 1) in self.get_players_state:
                 return True
@@ -117,9 +117,12 @@ class GameEnvironment(Singleton):
         new_state = self.moving_agent(state, action)
         # Calcul recompense agent et lui transmettre
         if new_state in self.__states:
-            if self.__states[new_state] in [WALL, PLAYER] or new_state[1] > len(ARENA) or new_state[1] < 0:
+            if self.__states[new_state] in [WALL] or new_state[1] > len(ARENA) or new_state[1] < 0:
                 reward = REWARD_OUT
-            elif action == PUNCH and self.is_near_players(state, self.__states):
+            elif new_state in self.get_players_state:
+                reward = REWARD_OUT
+            elif action == PUNCH and self.is_near_players(new_state):
+                print("BLOOOOOOOOOOOOOPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP")
                 reward = self.attack_near_players(new_state)
             elif action == BLOCK:
                 reward = REWARD_BLOCK
@@ -142,7 +145,7 @@ class GameEnvironment(Singleton):
             if s in self.get_players_state:
                 print('P', end='')
             elif self.__states[s] == PLAYER:
-                print('', end='')
+                print(' ', end='')
             else:
                 print(self.__states[s], end='')
             if incr % width == 0:
@@ -274,12 +277,13 @@ class AgentManager:
         # Apply moving actions
         for i in range(len(agents)):
             agent = agents[i]
-            #print('Agent ', i, ' action :', agent.actual_action)
-            #print('Agent ', i, ' health :', agent.health)
+            print('Agent ', i, ' action :', agent.actual_action)
+            print('Agent ', i, ' health :', agent.health)
             if agent.is_alive():
                 if agent.actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
         # Apply others actions
+        #print(self.__environment.get_players_state)
         for i in range(len(agents)):
             agent = agents[i]
             if agents[i].is_alive():
@@ -301,8 +305,8 @@ if __name__ == '__main__':
             iteration += 1
             am.best_actions()
             am.apply_actions(am.get_alive_agents)
-            #if iteration % 10000 == 0:
+            #if iteration % 1000 == 0:
                 #print('iteration :', iteration)
-            if (i == 1):
+            if (i == 0):
                 time.sleep(0.3)
                 env.display(i, iteration, len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
