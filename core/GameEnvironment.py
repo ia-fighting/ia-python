@@ -3,7 +3,7 @@ import time
 from utils.Singleton import Singleton
 import os
 
-ARENA = """#*           *#"""
+ARENA = """#*  *#"""
 
 #TODO: QUESTION mettre plusieurs joueurs sur la map
 
@@ -94,14 +94,14 @@ class GameEnvironment(Singleton):
             if agent.state == (new_state[0], new_state[1] - 1) \
                     or agent.state == (new_state[0], new_state[1] + 1):
                 if agent.actual_action != BLOCK:
-                    agent.health -= 20
-                    print("{} has been wounded".format(agent.health))
+                    agent.health = agent.health - 20
+                    #print("{} has been wounded".format(agent.health))
                     reward += REWARD_BEING_TOUCH
                     if agent.health <= 0:
                         self.__players.remove(agent)
                         reward += REWARD_KILL_TARGET
                 else:
-                    reward += REWARD_TOUCH_EMPTY
+                    reward = REWARD_TOUCH_EMPTY
         return reward
 
     #list of player state
@@ -109,20 +109,28 @@ class GameEnvironment(Singleton):
     def get_players_state(self):
         return [player.state for player in self.players]
 
+
+    def other_players_state(self, new_state):
+        players_state = self.get_players_state.copy()
+        #remove state from get_players_state
+        if new_state in self.get_players_state:
+            players_state.remove(new_state)
+        return players_state
+
     # Appliquer une action sur l'environnement
     # On met à jour l'état de l'agent, on lui donne sa récompense
     def apply(self, agent):
         state = agent.state
+        has_neighbours = self.is_near_players(state)
         action = agent.actual_action
         new_state = self.moving_agent(state, action)
         # Calcul recompense agent et lui transmettre
         if new_state in self.__states:
             if self.__states[new_state] in [WALL] or new_state[1] > len(ARENA) or new_state[1] < 0:
                 reward = REWARD_OUT
-            elif new_state in self.get_players_state:
+            elif new_state in self.other_players_state(new_state):
                 reward = REWARD_OUT
-            elif action == PUNCH and self.is_near_players(new_state):
-                print("BLOOOOOOOOOOOOOPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP")
+            elif action == PUNCH and self.is_near_players(state):
                 reward = self.attack_near_players(new_state)
             elif action == BLOCK:
                 reward = REWARD_BLOCK
@@ -131,7 +139,7 @@ class GameEnvironment(Singleton):
             state = new_state
         else:
             reward = REWARD_OUT
-        agent.update(action, state, reward)
+        agent.update(action, state, has_neighbours, reward)
         return reward
 
     def display(self, generation, iteration, width):
@@ -166,7 +174,9 @@ class Agent:
         for s in environment.states:
             self.__qtable[s] = {}
             for a in ACTIONS:
-                self.__qtable[s][a] = 0.0
+                self.__qtable[s][a] = {}
+                for k in range(2):
+                    self.__qtable[s][a][k % 2 == 0] = 0.0
 
     def _get_health(self):
         return self.__health
@@ -174,6 +184,13 @@ class Agent:
     def _set_health(self, health):
         self.__health = health
 
+    def _get_state(self):
+        return self.__state
+
+    def _set_state(self, state):
+        self.__state = state
+
+    state = property(_get_state, _set_state)
     health = property(_get_health, _set_health)
 
     def is_alive(self):
@@ -190,15 +207,19 @@ class Agent:
     actual_action = property(_get_actual_action, _set_actual_action)
 
 
-    def update(self, action, new_state, reward):
+    def update(self, action, new_state, has_neighbours, reward):
         # QTable update
         # Q(s, a) <- Q(s, a) + learning_rate * [reward + discount_factor * max(qtable[a]) - Q(s, a)]
-        maxQ = max(self.__qtable[new_state].values())
-        LEARNING_RATE = 1
+        maxQ = 0.0
+        # max of qtable
+        for a in ACTIONS:
+            if self.__qtable[new_state][a][has_neighbours] > maxQ:
+                maxQ = self.__qtable[new_state][a][has_neighbours]
+        LEARNING_RATE = 0.5
         DISCOUNT_FACTOR = 0.5
 
-        self.__qtable[self.__state][action] += LEARNING_RATE * \
-                                               (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][action])
+        self.__qtable[self.__state][action][has_neighbours] += LEARNING_RATE * \
+                                               (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][action][has_neighbours])
 
         self.__state = new_state
         self.__score += reward
@@ -206,11 +227,12 @@ class Agent:
         self.__actual_action = None
 
     # Best action who maximise reward
-    def best_action(self):
+    def best_action(self, environment):
         possible_rewards = self.__qtable[self.__state]
         best = None
         for a in possible_rewards:
-            if best is None or possible_rewards[a] > possible_rewards[best]:
+            has_neighbours = environment.is_near_players(self.__state)
+            if best is None or possible_rewards[a][has_neighbours] > possible_rewards[best][has_neighbours]:
                 best = a
                 self.__actual_action = best
 
@@ -234,8 +256,9 @@ class AgentManager:
     def __init__(self, environment, population, health):
         self.__environment = environment
         self.__population = population
+        self.__health = health
         self.__agents = []
-        for i in range(population):
+        for i in range(self.__population):
             self.__agents.append(Agent(self.__environment, health, self.__environment.players_pos[i]))
             self.__environment.players = self.__agents
 
@@ -254,6 +277,21 @@ class AgentManager:
     def get_agents(self):
         return self.__agents
 
+    @property
+    def get_agents_health(self):
+        return self.__health
+
+    def reset(self):
+        # for each agent, reset the health and the state
+        for i in range(len(self.get_agents)):
+            self.__agents[i].health = self.get_agents_health
+        for j in range(i + 1, self.__population):
+            self.__agents.append(Agent(self.__environment, self.get_agents_health, self.__environment.players_pos[j]))
+            self.__environment.players = self.__agents
+        self.__environment.players = self.__agents
+        self.__score = 0
+        self.__last_action = None
+
     # get all alive agents
     @property
     def get_alive_agents(self):
@@ -271,19 +309,20 @@ class AgentManager:
     def best_actions(self):
         for a in self.__agents:
             if a.is_alive():
-                a.best_action()
+                a.best_action(self.__environment)
 
     def apply_actions(self, agents):
         # Apply moving actions
         for i in range(len(agents)):
             agent = agents[i]
-            print('Agent ', i, ' action :', agent.actual_action)
-            print('Agent ', i, ' health :', agent.health)
+            #print('Agent ', i, ' action :', agent.actual_action)
+            #print('Agent ', i, ' health :', agent.health)
             if agent.is_alive():
                 if agent.actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
         # Apply others actions
         #print(self.__environment.get_players_state)
+        #print(self.__environment.is_near_players(agents[0].state))
         for i in range(len(agents)):
             agent = agents[i]
             if agents[i].is_alive():
@@ -298,8 +337,9 @@ if __name__ == '__main__':
     am = AgentManager(env, 2, 80)
     print(env.states)
 
-    for i in range(1):
+    for i in range(30):
         print('GEN: ', i)
+        am.reset()
         iteration = 0
         while not am.goal:
             iteration += 1
@@ -307,6 +347,7 @@ if __name__ == '__main__':
             am.apply_actions(am.get_alive_agents)
             #if iteration % 1000 == 0:
                 #print('iteration :', iteration)
-            if (i == 0):
+            """if (i == 0):
                 time.sleep(0.3)
-                env.display(i, iteration, len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
+                env.display(i, iteration, len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))"""
+        print('GEN: ', i, ' - ', iteration, ' iterations')
