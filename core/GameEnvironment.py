@@ -64,6 +64,10 @@ class GameEnvironment(Singleton):
     def states(self):
         return self.__states.keys()
 
+    @property
+    def all_states(self):
+        return self.__states
+
     def is_near_players(self, state):
         if state[1] < len(ARENA) - 1:
             if (state[0], state[1] + 1) in self.get_players_state:
@@ -141,24 +145,6 @@ class GameEnvironment(Singleton):
             reward = REWARD_OUT
         agent.update(action, state, has_neighbours, reward)
         return reward
-
-    def display(self, generation, iteration, width):
-        os.system('cls')
-        incr = 0
-        print('GEN: ', generation)
-        print("ITERATION: ", iteration)
-        print()
-        for s in self.__states:
-            incr += 1
-            if s in self.get_players_state:
-                print('P', end='')
-            elif self.__states[s] == PLAYER:
-                print(' ', end='')
-            else:
-                print(self.__states[s], end='')
-            if incr % width == 0:
-                print()
-        print()
 
 
 class Agent:
@@ -251,6 +237,10 @@ class Agent:
     def reset(self, environment):
         self.__state = environment.start
 
+    @property
+    def last_action(self):
+        return self.__last_action
+
 
 class AgentManager:
     def __init__(self, environment, population, health):
@@ -329,6 +319,26 @@ class AgentManager:
                 if agent.actual_action not in MOVING_ACTIONS and agent.actual_action is not None:
                     self.__environment.apply(agent)
 
+    def display(self, generation, iteration, width):
+        os.system('cls')
+        incr = 0
+        print('GEN: ', generation)
+        print("ITERATION: ", iteration)
+        print()
+        for s in self.__environment.all_states:
+            incr += 1
+            if s in self.__environment.get_players_state:
+                print('P', end='')
+            elif self.__environment.all_states[s] == PLAYER:
+                print(' ', end='')
+            else:
+                print(self.__environment.all_states[s], end='')
+            if incr % width == 0:
+                print()
+        for i in range(len(self.__agents)):
+            print('Agent ', i, ' health :', self.__agents[i].health)
+            print('Agent ', i, ' action :', self.__agents[i].last_action)
+        print()
 
 if __name__ == '__main__':
     env = GameEnvironment(ARENA)
@@ -347,7 +357,7 @@ if __name__ == '__main__':
             am.apply_actions(am.get_alive_agents)
             #if iteration % 1000 == 0:
                 #print('iteration :', iteration)
-            """if (i == 0):
+            if (i == 4):
                 time.sleep(0.3)
-                env.display(i, iteration, len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))"""
+                am.display(i, iteration, len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
         print('GEN: ', i, ' - ', iteration, ' iterations')
