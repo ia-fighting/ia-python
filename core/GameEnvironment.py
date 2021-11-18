@@ -66,10 +66,10 @@ class GameEnvironment(Singleton):
 
     def is_near_players(self, state, states):
         if state[1] < len(ARENA) - 1:
-            if (state[0], state[1] + 1) in self.players_pos:
+            if (state[0], state[1] + 1) in self.get_players_state:
                 return True
         if state[1] >= 1:
-            if (state[0], state[1] - 1) in self.players_pos:
+            if (state[0], state[1] - 1) in self.get_players_state:
                 return True
         return False
 
@@ -95,6 +95,7 @@ class GameEnvironment(Singleton):
                     or agent.state == (new_state[0], new_state[1] + 1):
                 if agent.actual_action != BLOCK:
                     agent.health -= 20
+                    print("{} has been wounded".format(agent.health))
                     reward += REWARD_BEING_TOUCH
                     if agent.health <= 0:
                         self.__players.remove(agent)
@@ -102,6 +103,11 @@ class GameEnvironment(Singleton):
                 else:
                     reward += REWARD_TOUCH_EMPTY
         return reward
+
+    #list of player state
+    @property
+    def get_players_state(self):
+        return [player.state for player in self.players]
 
     # Appliquer une action sur l'environnement
     # On met à jour l'état de l'agent, on lui donne sa récompense
@@ -131,12 +137,9 @@ class GameEnvironment(Singleton):
         print('GEN: ', generation)
         print("ITERATION: ", iteration)
         print()
-        players_states = []
-        for player in self.players:
-            players_states.append(player.state)
         for s in self.__states:
             incr += 1
-            if s in players_states:
+            if s in self.get_players_state:
                 print('P', end='')
             elif self.__states[s] == PLAYER:
                 print('', end='')
@@ -271,8 +274,8 @@ class AgentManager:
         # Apply moving actions
         for i in range(len(agents)):
             agent = agents[i]
-            print('Agent ', i, ' action :', agent.actual_action)
-            print('Agent ', i, ' health :', agent.health)
+            #print('Agent ', i, ' action :', agent.actual_action)
+            #print('Agent ', i, ' health :', agent.health)
             if agent.is_alive():
                 if agent.actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
@@ -298,6 +301,8 @@ if __name__ == '__main__':
             iteration += 1
             am.best_actions()
             am.apply_actions(am.get_alive_agents)
-            if (i == 0):
+            #if iteration % 10000 == 0:
+                #print('iteration :', iteration)
+            if (i == 1):
                 time.sleep(0.3)
                 env.display(i, iteration, len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
