@@ -152,6 +152,9 @@ class MyGame(arcade.Window):
         # Background image will be stored in this variable
         self.background = None
 
+        self.active_ambiance = True
+        self.ambiance_player = None
+
         # Separate variable that holds the players sprite
         self.player_one_sprite = None
         self.player_two_sprite = None
@@ -179,8 +182,10 @@ class MyGame(arcade.Window):
         self.scene = arcade.Scene()
 
         self.bone = None
+        self.music_btn_on = None
+        self.music_btn_off = None
 
-        arcade.play_sound(self.ambiance, 0.8, 0.0, True)
+        self.ambiance_player = arcade.play_sound(self.ambiance, 0.8, 0.0, True)
 
         sprites_path = "./asset/sprites/png/"
         # Load the background image. Do this in the setup so we don't keep reloading it all the time.
@@ -249,6 +254,13 @@ class MyGame(arcade.Window):
             heart.position = coordinate_heart
             self.player_two_health_bar.append(heart)
 
+        coordinate_music = [970, 30]
+        self.music_btn_on = arcade.Sprite(":resources:onscreen_controls/shaded_dark/music_on.png", 0.8)
+        self.music_btn_on.position = coordinate_music
+
+        self.music_btn_off = arcade.Sprite(":resources:onscreen_controls/shaded_dark/music_off.png", 0.8)
+        self.music_btn_off.position = coordinate_music
+
         # Create the 'physics engine'
         self.player_one_physics_engine = arcade.PhysicsEnginePlatformer(
             self.player_one_sprite, gravity_constant=GRAVITY, walls=self.scene["Walls"]
@@ -275,9 +287,15 @@ class MyGame(arcade.Window):
         # Draw our Scene
         self.scene.draw()
         self.bone.draw()
+        self.music_btn_off.draw()
+        self.music_btn_on.draw()
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed."""
+        # Gui
+        if key == arcade.key.M:
+            self.active_ambiance = not self.active_ambiance
+
         # Player One Actions
         if key == arcade.key.UP or key == arcade.key.Z:
             if self.player_one_physics_engine.can_jump():
@@ -313,6 +331,8 @@ class MyGame(arcade.Window):
             self.player_one_sprite.change_x = 0
         elif key == arcade.key.A:
             self.player_one_sprite.attacking = False
+        elif key == arcade.key.M:
+            pass
 
         if key == arcade.key.J:
             self.player_two_sprite.change_x = 0
@@ -323,6 +343,23 @@ class MyGame(arcade.Window):
 
     def on_update(self, delta_time):
         """Movement and game logic"""
+
+        if not self.active_ambiance:
+            arcade.Sound.set_volume(self=self, volume=0, player=self.ambiance_player)
+            coordinate_music = [970, 30]
+            self.music_btn_off = arcade.Sprite(":resources:onscreen_controls/shaded_dark/music_off.png", 0.8)
+            self.music_btn_off.position = coordinate_music
+            self.music_btn_off.draw()
+            self.music_btn_on.kill()
+
+        else:
+            arcade.Sound.set_volume(self=self, volume=1, player=self.ambiance_player)
+            coordinate_music = [970, 30]
+            self.music_btn_on = arcade.Sprite(":resources:onscreen_controls/shaded_dark/music_on.png", 0.8)
+            self.music_btn_on.position = coordinate_music
+            self.music_btn_on.draw()
+            if self.music_btn_off:
+                self.music_btn_off.kill()
 
         # Remove heart
         if MAX_HP > self.player_one_sprite.hp >= 0 and self.player_one_sprite.touched:
