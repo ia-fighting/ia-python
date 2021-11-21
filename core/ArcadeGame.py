@@ -180,7 +180,7 @@ class MyGame(arcade.Window):
 
         self.bone = None
 
-        # arcade.play_sound(self.ambiance, 0.8, 0.0, True)
+        arcade.play_sound(self.ambiance, 0.8, 0.0, True)
 
         sprites_path = "./asset/sprites/png/"
         # Load the background image. Do this in the setup so we don't keep reloading it all the time.
