@@ -2,6 +2,8 @@
 Platformer Game
 """
 import arcade
+from PIL.Image import Image
+from arcade.gui import UIManager
 
 # Constants
 SCREEN_WIDTH = 1000
@@ -135,6 +137,10 @@ class PlayerCharacter(arcade.Sprite):
                 self.attacking = False
             self.texture = self.attack_textures[self.cur_attack_texture][self.character_face_direction]
 
+class MyFlatButton(arcade.gui.UIFlatButton):
+    def on_click(self):
+        print("Click flat button. ")
+
 
 class MyGame(arcade.Window):
     """
@@ -148,6 +154,10 @@ class MyGame(arcade.Window):
 
         # Our Scene Object
         self.scene = None
+
+        # Initialize  Ui Manager
+        self.ui_manager = UIManager()
+        self.ui_manager.enable()
 
         # Background image will be stored in this variable
         self.background = None
@@ -168,6 +178,8 @@ class MyGame(arcade.Window):
 
         self.wall_list = None
 
+        self.music_toggle_button = None
+
         # Load sounds
         sounds_path = "./asset/sounds/"
         self.jump_sound = arcade.load_sound(f"{sounds_path}/jump.mp3")
@@ -182,8 +194,6 @@ class MyGame(arcade.Window):
         self.scene = arcade.Scene()
 
         self.bone = None
-        self.music_btn_on = None
-        self.music_btn_off = None
 
         self.ambiance_player = arcade.play_sound(self.ambiance, 0.8, 0.0, True)
 
@@ -254,12 +264,15 @@ class MyGame(arcade.Window):
             heart.position = coordinate_heart
             self.player_two_health_bar.append(heart)
 
-        coordinate_music = [970, 30]
-        self.music_btn_on = arcade.Sprite(":resources:onscreen_controls/shaded_dark/music_on.png", 0.8)
-        self.music_btn_on.position = coordinate_music
-
-        self.music_btn_off = arcade.Sprite(":resources:onscreen_controls/shaded_dark/music_off.png", 0.8)
-        self.music_btn_off.position = coordinate_music
+        self.music_toggle_button = arcade.gui.UITextureButton(
+            x=930,
+            y=20,
+            texture=arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_on.png'),
+            texture_hovered=arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_off.png'),
+            texture_pressed=arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_off.png'),
+        )
+        self.music_toggle_button.on_click = self.toggle_music
+        self.ui_manager.add(self.music_toggle_button)
 
         # Create the 'physics engine'
         self.player_one_physics_engine = arcade.PhysicsEnginePlatformer(
@@ -269,6 +282,16 @@ class MyGame(arcade.Window):
         self.player_two_physics_engine = arcade.PhysicsEnginePlatformer(
             self.player_two_sprite, gravity_constant=GRAVITY, walls=self.scene["Walls"]
         )
+
+    def toggle_music(self, event):
+        if self.active_ambiance:
+            arcade.Sound.set_volume(self=self, volume=0, player=self.ambiance_player)
+            self.music_toggle_button.texture = arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_off.png')
+            self.active_ambiance = False
+        else:
+            arcade.Sound.set_volume(self=self, volume=1, player=self.ambiance_player)
+            self.music_toggle_button.texture = arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_on.png')
+            self.active_ambiance = True
 
     def on_draw(self):
         """Render the screen."""
@@ -287,14 +310,13 @@ class MyGame(arcade.Window):
         # Draw our Scene
         self.scene.draw()
         self.bone.draw()
-        self.music_btn_off.draw()
-        self.music_btn_on.draw()
+        self.ui_manager.draw()
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed."""
         # Gui
         if key == arcade.key.M:
-            self.active_ambiance = not self.active_ambiance
+            self.toggle_music(event=None)
 
         # Player One Actions
         if key == arcade.key.UP or key == arcade.key.Z:
@@ -343,23 +365,6 @@ class MyGame(arcade.Window):
 
     def on_update(self, delta_time):
         """Movement and game logic"""
-
-        if not self.active_ambiance:
-            arcade.Sound.set_volume(self=self, volume=0, player=self.ambiance_player)
-            coordinate_music = [970, 30]
-            self.music_btn_off = arcade.Sprite(":resources:onscreen_controls/shaded_dark/music_off.png", 0.8)
-            self.music_btn_off.position = coordinate_music
-            self.music_btn_off.draw()
-            self.music_btn_on.kill()
-
-        else:
-            arcade.Sound.set_volume(self=self, volume=1, player=self.ambiance_player)
-            coordinate_music = [970, 30]
-            self.music_btn_on = arcade.Sprite(":resources:onscreen_controls/shaded_dark/music_on.png", 0.8)
-            self.music_btn_on.position = coordinate_music
-            self.music_btn_on.draw()
-            if self.music_btn_off:
-                self.music_btn_off.kill()
 
         # Remove heart
         if MAX_HP > self.player_one_sprite.hp >= 0 and self.player_one_sprite.touched:
