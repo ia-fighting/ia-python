@@ -22,7 +22,7 @@ GRAVITY = 2
 PLAYER_JUMP_SPEED = 30
 
 PLAYER_ONE_START_X = SPRITE_PIXEL_SIZE * TILE_SCALING * 5
-PLAYER_ONE_START_Y = SPRITE_PIXEL_SIZE * TILE_SCALING * 1
+PLAYER_ONE_START_Y = SPRITE_PIXEL_SIZE * TILE_SCALING * 3
 
 PLAYER_TWO_START_X = SPRITE_PIXEL_SIZE * TILE_SCALING * 10
 PLAYER_TWO_START_Y = SPRITE_PIXEL_SIZE * TILE_SCALING * 3
@@ -96,7 +96,7 @@ class PlayerCharacter(arcade.Sprite):
     def attack(self, sound, target):
         arcade.play_sound(sound)
         self.attacking = True
-        if target.change_x <= self.change_x + 10 or target.change_x <= self.change_x - 10:
+        if arcade.get_distance_between_sprites(self, target) < 65:
             target.hp -= 1
             target.touched = True
 
@@ -131,16 +131,12 @@ class PlayerCharacter(arcade.Sprite):
 
         # Attacking animation
         if self.attacking:
+            self.cur_attack_texture = 0
             self.cur_attack_texture += 1
             if self.cur_attack_texture > 5:
                 self.cur_attack_texture = 0
                 self.attacking = False
             self.texture = self.attack_textures[self.cur_attack_texture][self.character_face_direction]
-
-class MyFlatButton(arcade.gui.UIFlatButton):
-    def on_click(self):
-        print("Click flat button. ")
-
 
 class MyGame(arcade.Window):
     """
@@ -222,44 +218,56 @@ class MyGame(arcade.Window):
         # This shows using a loop to place multiple sprites horizontally
         tile_source = f"{sprites_path}/tiles/tile2.png"
         for x in range(0, 1250, 64):
-            wall = arcade.Sprite(tile_source, 0.8)
+            wall = arcade.Sprite(tile_source, 1)
             wall.center_x = x
             wall.center_y = 64
             self.scene.add_sprite("Walls", wall)
 
-        coordinate_tree = [512, 284]
+        coordinate_tree = [512, 304]
         tree = arcade.Sprite(f"{sprites_path}/objects/tree.png", 1.5)
         tree.position = coordinate_tree
         self.wall_list.append(tree)
 
-        coordinate_tomb = [768, 148]
+        coordinate_tomb = [768, 168]
         tomb = arcade.Sprite(f"{sprites_path}/objects/tomb_stone1.png", 1.5)
         tomb.position = coordinate_tomb
         self.wall_list.append(tomb)
 
-        coordinate_arrow = [156, 152]
+        coordinate_arrow = [156, 172]
         arrow = arcade.Sprite(f"{sprites_path}/objects/arrow_sign.png", 1)
         arrow.position = coordinate_arrow
         self.wall_list.append(arrow)
 
-        coordinate_skeleton = [456, 128]
+        coordinate_skeleton = [456, 140]
         skeleton = arcade.Sprite(f"{sprites_path}/objects/skeleton.png", 0.5)
         skeleton.position = coordinate_skeleton
         self.wall_list.append(skeleton)
 
         # Create the ground
-        coordinate_bone = [755, 70]
-        self.bone = arcade.Sprite(f"{sprites_path}/tiles/bone3.png", 0.5)
+        coordinate_bone = [755, 80]
+        self.bone = arcade.Sprite(f"{sprites_path}/tiles/bone3.png", 0.7)
         self.bone.position = coordinate_bone
 
+        # Create the player one preview
+        coordinate_player_one_preview = [35, 590]
+        player_one_preview = arcade.Sprite(f"{sprites_path}/male/preview.png", 0.2)
+        player_one_preview.position = coordinate_player_one_preview
+        self.wall_list.append(player_one_preview)
+
+        # Create the player one preview
+        coordinate_player_two_preview = [965, 590]
+        player_two_preview = arcade.Sprite(f"{sprites_path}/female/preview.png", 0.2)
+        player_two_preview.position = coordinate_player_two_preview
+        self.wall_list.append(player_two_preview)
+
         for i in range(1, self.player_one_sprite.hp + 1):
-            coordinate_heart = [30 + i * 30, 600]
+            coordinate_heart = [60 + i * 30, 600]
             heart = arcade.Sprite(f"{sprites_path}/objects/heart.png", 0.05)
             heart.position = coordinate_heart
             self.player_one_health_bar.append(heart)
 
         for i in range(1, self.player_two_sprite.hp + 1):
-            coordinate_heart = [970 - i * 30, 600]
+            coordinate_heart = [940 - i * 30, 600]
             heart = arcade.Sprite(f"{sprites_path}/objects/heart.png", 0.05)
             heart.position = coordinate_heart
             self.player_two_health_bar.append(heart)
@@ -328,8 +336,11 @@ class MyGame(arcade.Window):
         elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.player_one_sprite.change_x = PLAYER_MOVEMENT_SPEED
         elif key == arcade.key.A:
+            if self.player_one_sprite.character_face_direction == LEFT_FACING:
+                self.player_one_sprite.change_x = -1
+            else:
+                self.player_one_sprite.change_x = 1
             self.player_one_sprite.attack(self.attack_sound, self.player_two_sprite)
-            self.player_one_sprite.attacking = True
 
         # Player TWO Actions
         if key == arcade.key.I:
@@ -341,8 +352,11 @@ class MyGame(arcade.Window):
         elif key == arcade.key.L:
             self.player_two_sprite.change_x = PLAYER_MOVEMENT_SPEED
         elif key == arcade.key.U:
+            if self.player_two_sprite.character_face_direction == LEFT_FACING:
+                self.player_two_sprite.change_x = -1
+            else:
+                self.player_two_sprite.change_x = 1
             self.player_two_sprite.attack(self.attack_sound, self.player_one_sprite)
-            self.player_two_sprite.attacking = True
 
     def on_key_release(self, key, modifiers):
         """Called when the user releases a key."""
@@ -352,15 +366,15 @@ class MyGame(arcade.Window):
         elif key == arcade.key.RIGHT or key == arcade.key.D:
             self.player_one_sprite.change_x = 0
         elif key == arcade.key.A:
+            self.player_one_sprite.change_x = 0
             self.player_one_sprite.attacking = False
-        elif key == arcade.key.M:
-            pass
 
         if key == arcade.key.J:
             self.player_two_sprite.change_x = 0
         elif key == arcade.key.L:
             self.player_two_sprite.change_x = 0
-        elif key == arcade.key.Y:
+        elif key == arcade.key.U:
+            self.player_two_sprite.change_x = 0
             self.player_two_sprite.attacking = False
 
     def on_update(self, delta_time):
