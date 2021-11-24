@@ -58,6 +58,7 @@ class PlayerCharacter(arcade.Sprite):
         self.character_face_direction = face_direction
 
         self.hp = MAX_HP
+        self.score = 0
 
         # Used for flipping between image sequences
         self.cur_texture = 0
@@ -99,6 +100,8 @@ class PlayerCharacter(arcade.Sprite):
         if arcade.get_distance_between_sprites(self, target) < 65:
             target.hp -= 1
             target.touched = True
+            # Todo remove
+            self.score += 1
 
     def update_animation(self, delta_time: float = 1 / 60):
 
@@ -133,7 +136,7 @@ class PlayerCharacter(arcade.Sprite):
         if self.attacking:
             self.cur_attack_texture = 0
             self.cur_attack_texture += 1
-            if self.cur_attack_texture > 5:
+            if self.cur_attack_texture > 8:
                 self.cur_attack_texture = 0
                 self.attacking = False
             self.texture = self.attack_textures[self.cur_attack_texture][self.character_face_direction]
@@ -319,6 +322,32 @@ class MyGame(arcade.Window):
         self.scene.draw()
         self.bone.draw()
         self.ui_manager.draw()
+
+        # Draw player scores
+        player_one_score = f"Score: {self.player_one_sprite.score}"
+        arcade.draw_text(
+            player_one_score,
+            30,
+            550,
+            arcade.csscolor.WHITE,
+            14,
+            bold=True
+        )
+
+        # Draw player scores
+        player_two_score = f"Score: {self.player_two_sprite.score}"
+        arcade.draw_text(
+            player_two_score,
+            885,
+            550,
+            arcade.csscolor.WHITE,
+            14,
+            bold=True
+        )
+
+        # Hit_box
+        # self.player_two_sprite.draw_hit_box(arcade.color.RED)
+        # self.player_one_sprite.draw_hit_box(arcade.color.YELLOW)
 
     def on_key_press(self, key, modifiers):
         """Called whenever a key is pressed."""
