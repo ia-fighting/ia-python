@@ -6,6 +6,8 @@ from PIL.Image import Image
 from arcade.gui import UIManager
 
 # Constants
+from core.GameEnvironment import GameEnvironment, AgentManager, ARENA
+
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 650
 SCREEN_TITLE = "ZOMBIE FIGHTING"
@@ -201,6 +203,12 @@ class MyGame(arcade.Window):
         # Call the parent class and set up the window
         super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
 
+        self.ia_env = GameEnvironment(ARENA)
+
+        # initialize AgentManager
+        self.ia_am = AgentManager(self.ia_env, 2, 80)
+        self.run_ia()
+
         # Our Scene Object
         self.scene = None
 
@@ -238,6 +246,19 @@ class MyGame(arcade.Window):
         self.ambiance = arcade.load_sound(f"{sounds_path}/ambiance.mp3")
         self.block_sound = arcade.load_sound(f"{sounds_path}/block.mp3")
         self.hit_sound = arcade.load_sound(f"{sounds_path}/hit.mp3")
+
+    def run_ia(self):
+        for i in range(30):
+            print('GEN: ', i)
+            self.ia_am.reset()
+            iteration = 0
+            while not self.ia_am.goal:
+                iteration += 1
+                self.ia_am.best_actions()
+                self.ia_am.apply_actions(self.ia_am.get_alive_agents)
+                # if iteration % 1000 == 0:
+                # print('iteration :', iteration)
+            print('GEN: ', i, ' - ', iteration, ' iterations')
 
     def setup(self):
         """Set up the game here. Call this function to restart the game."""

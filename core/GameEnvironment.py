@@ -1,10 +1,8 @@
 # Game environment class
 import time
 
-import arcade
 from pynput.keyboard import Controller
 
-from core.ArcadeGame import MyGame
 from utils.Singleton import Singleton
 import os
 
@@ -320,6 +318,7 @@ class AgentManager:
             if agent.is_alive():
                 if agent.actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
+                    self.update_front(agent.actual_action, i)
         # Apply others actions
         #print(self.__environment.get_players_state)
         #print(self.__environment.is_near_players(agents[0].state))
@@ -352,22 +351,24 @@ class AgentManager:
         print()
 
     def update_front(self, action, player):
-        key = self.retrieve_key_font(action, player)
-        self.get_keyboard.press(key)
-        self.get_keyboard.release(key)
+        if action is not None:
+            key = self.retrieve_key_font(action, player)
+            print(action)
+            print(player)
+            print(key)
+            self.get_keyboard.press(key)
+            self.get_keyboard.release(key)
+        else:
+            print('BLOP')
 
     def retrieve_key_font(self, action, player):
-        if player == 1:
+        if player == 0:
            return player1[action]
-        elif player == 2:
+        elif player == 1:
            return player2[action]
 
 if __name__ == '__main__':
     env = GameEnvironment(ARENA)
-    window = MyGame()
-    window.setup()
-    arcade.run()
-
 
     # initialize AgentManager
     am = AgentManager(env, 2, 80)
