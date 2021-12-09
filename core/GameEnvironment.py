@@ -1,5 +1,10 @@
 # Game environment class
 import time
+
+import arcade
+from pynput.keyboard import Controller
+
+from core.ArcadeGame import MyGame
 from utils.Singleton import Singleton
 import os
 
@@ -24,6 +29,9 @@ PUNCH = 'P'
 BLOCK = 'B'
 ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
 MOVING_ACTIONS = [RIGHT, LEFT]
+
+player1 = {RIGHT: 'D', LEFT: 'Q', PUNCH:'A', BLOCK:'E'}
+player2 = {RIGHT: 'L', LEFT: 'J', PUNCH:'U', BLOCK:'O'}
 
 
 class GameEnvironment(Singleton):
@@ -144,7 +152,6 @@ class GameEnvironment(Singleton):
         agent.update(action, state, has_neighbours, reward)
         return reward
 
-
 class Agent:
     def __init__(self, environment, health, position):
         self.__state = position
@@ -246,6 +253,7 @@ class AgentManager:
         self.__population = population
         self.__health = health
         self.__agents = []
+        self.__keyboard = Controller()
         for i in range(self.__population):
             self.__agents.append(Agent(self.__environment, health, self.__environment.players_pos[i]))
             self.__environment.players = self.__agents
@@ -279,6 +287,10 @@ class AgentManager:
         self.__environment.players = self.__agents
         self.__score = 0
         self.__last_action = None
+
+    @property
+    def get_keyboard(self):
+        return self.__keyboard
 
     # get all alive agents
     @property
@@ -316,6 +328,7 @@ class AgentManager:
             if agents[i].is_alive():
                 if agent.actual_action not in MOVING_ACTIONS and agent.actual_action is not None:
                     self.__environment.apply(agent)
+                    self.update_front(agent.actual_action, i)
 
     def display(self, generation, iteration, width):
         os.system('cls')
@@ -338,8 +351,23 @@ class AgentManager:
             print('Agent ', i, ' action :', self.__agents[i].last_action)
         print()
 
+    def update_front(self, action, player):
+        key = self.retrieve_key_font(action, player)
+        self.get_keyboard.press(key)
+        self.get_keyboard.release(key)
+
+    def retrieve_key_font(self, action, player):
+        if player == 1:
+           return player1[action]
+        elif player == 2:
+           return player2[action]
+
 if __name__ == '__main__':
     env = GameEnvironment(ARENA)
+    window = MyGame()
+    window.setup()
+    arcade.run()
+
 
     # initialize AgentManager
     am = AgentManager(env, 2, 80)
