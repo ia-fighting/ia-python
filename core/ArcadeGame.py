@@ -37,6 +37,7 @@ LAYER_NAME_LADDERS = "Ladders"
 LAYER_NAME_PLAYER_ONE = "PlayerOne"
 LAYER_NAME_PLAYER_TWO = "PlayerTwo"
 
+
 def load_texture_pair(filename):
     """
     Load a texture pair, with the second being a mirror image.
@@ -45,6 +46,7 @@ def load_texture_pair(filename):
         arcade.load_texture(filename),
         arcade.load_texture(filename, flipped_horizontally=True),
     ]
+
 
 class PlayerCharacter(arcade.Sprite):
     """Player Sprite"""
@@ -63,12 +65,18 @@ class PlayerCharacter(arcade.Sprite):
         # Used for flipping between image sequences
         self.cur_texture = 0
         self.cur_attack_texture = 0
+        self.cur_idle_texture = 0
+        self.cur_dead_texture = 0
         self.scale = CHARACTER_SCALING
 
         # Track our state
         self.is_on_ladder = False
         self.attacking = False
         self.touched = False
+        self.blocking = False
+        self.is_dead = False
+        self.is_alive = True
+        self.is_down = False
 
         # --- Load Textures ---
         main_path = f"./asset/sprites/png/{sprites}"
@@ -77,31 +85,50 @@ class PlayerCharacter(arcade.Sprite):
         self.idle_texture_pair = load_texture_pair(f"{main_path}/Idle1.png")
         self.jump_texture_pair = load_texture_pair(f"{main_path}/Dead3.png")
         self.fall_texture_pair = load_texture_pair(f"{main_path}/Idle1.png")
+        self.block_texture_pair = load_texture_pair(f"{main_path}/Dead1.png")
 
         # Load textures for walking
         self.walk_textures = []
         for i in range(1, 10):
-            texture = load_texture_pair(f"{main_path}/Walk{i}.png")
-            self.walk_textures.append(texture)
+            walk_texture = load_texture_pair(f"{main_path}/Walk{i}.png")
+            self.walk_textures.append(walk_texture)
 
         # Load textures for attacking
         self.attack_textures = []
         for i in range(1, 8):
-            texture = load_texture_pair(f"{main_path}/Attack{i}.png")
-            self.attack_textures.append(texture)
+            attack_texture = load_texture_pair(f"{main_path}/Attack{i}.png")
+            self.attack_textures.append(attack_texture)
+
+        self.idle_textures = []
+        for i in range(1, 16):
+            idle_texture = load_texture_pair(f"{main_path}/Idle{i}.png")
+            self.idle_textures.append(idle_texture)
+
+        self.dead_textures = []
+        for i in range(1, 13):
+            dead_texture = load_texture_pair(f"{main_path}/Dead{i}.png")
+            self.dead_textures.append(dead_texture)
 
         # Set the initial texture
         if not self.attacking:
             self.texture = self.idle_texture_pair[0]
 
-    def attack(self, sound, target):
-        arcade.play_sound(sound)
+    def attack(self, target, attack_sound, hit_sound, block_sound):
+        arcade.play_sound(attack_sound)
         self.attacking = True
         if arcade.get_distance_between_sprites(self, target) < 65:
-            target.hp -= 1
-            target.touched = True
+            if target.blocking:
+                arcade.play_sound(block_sound)
+            else:
+                target.touched = True
+                target.hp -= 1
+                arcade.play_sound(hit_sound)
+
             # Todo remove
             self.score += 1
+
+        if target.hp <=0:
+            target.is_alive = False
 
     def update_animation(self, delta_time: float = 1 / 60):
 
@@ -119,27 +146,50 @@ class PlayerCharacter(arcade.Sprite):
             self.texture = self.fall_texture_pair[self.character_face_direction]
             return
 
-        # Idle animation
-        if self.change_x == 0:
-            self.texture = self.idle_texture_pair[self.character_face_direction]
+        # Block animation
+        if self.blocking == True:
+            self.texture = self.block_texture_pair[self.character_face_direction]
             return
 
-        # Walking animation
-        self.cur_texture += 1
-        if self.cur_texture > 7:
-            self.cur_texture = 0
-        self.texture = self.walk_textures[self.cur_texture][
-            self.character_face_direction
-        ]
-
         # Attacking animation
-        if self.attacking:
+        if self.attacking and self.change_x == 0:
             self.cur_attack_texture = 0
             self.cur_attack_texture += 1
             if self.cur_attack_texture > 8:
                 self.cur_attack_texture = 0
                 self.attacking = False
-            self.texture = self.attack_textures[self.cur_attack_texture][self.character_face_direction]
+            self.texture = self.attack_textures[self.cur_attack_texture][
+                self.character_face_direction
+            ]
+            return
+        elif not self.is_alive and not self.is_down and self.change_x == 0:
+            self.cur_dead_texture += 1
+            if self.cur_dead_texture > 10:
+                self.is_down = True
+            self.texture = self.dead_textures[self.cur_dead_texture][
+                self.character_face_direction
+            ]
+            return
+        # Idle animation
+        elif self.change_x == 0 and self.is_alive:
+            self.cur_idle_texture += 1
+            if self.cur_idle_texture > 14:
+                self.cur_idle_texture = 0
+            self.texture = self.idle_textures[self.cur_idle_texture][
+                self.character_face_direction
+            ]
+            return
+
+
+        # Walking animation
+        if not self.is_down:
+            self.cur_texture += 1
+            if self.cur_texture > 7:
+                self.cur_texture = 0
+            self.texture = self.walk_textures[self.cur_texture][
+                self.character_face_direction
+            ]
+
 
 class MyGame(arcade.Window):
     """
@@ -172,6 +222,8 @@ class MyGame(arcade.Window):
         self.player_one_health_bar = None
         self.player_two_health_bar = None
 
+        self.game_over = None
+
         # Our physics engine
         self.physics_engine = None
 
@@ -184,7 +236,8 @@ class MyGame(arcade.Window):
         self.jump_sound = arcade.load_sound(f"{sounds_path}/jump.mp3")
         self.attack_sound = arcade.load_sound(f"{sounds_path}/attack_short.mp3")
         self.ambiance = arcade.load_sound(f"{sounds_path}/ambiance.mp3")
-
+        self.block_sound = arcade.load_sound(f"{sounds_path}/block.mp3")
+        self.hit_sound = arcade.load_sound(f"{sounds_path}/hit.mp3")
 
     def setup(self):
         """Set up the game here. Call this function to restart the game."""
@@ -282,6 +335,22 @@ class MyGame(arcade.Window):
             texture_hovered=arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_off.png'),
             texture_pressed=arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_off.png'),
         )
+
+        self.game_over = arcade.gui.UITextureButton(
+            x=400,
+            y=500,
+            texture=arcade.load_texture(f"{sprites_path}/objects/game_over.png", 0.5),
+        )
+
+        # self.game_over = arcade.gui.UITextArea(
+        #     x=400,
+        #     y=500,
+        #     text="Game Over",
+        #     font_name="Blackadder ITC",
+        #     font_size=30,
+        #     text_color=arcade.color.RED
+        # )
+
         self.music_toggle_button.on_click = self.toggle_music
         self.ui_manager.add(self.music_toggle_button)
 
@@ -297,11 +366,13 @@ class MyGame(arcade.Window):
     def toggle_music(self, event):
         if self.active_ambiance:
             arcade.Sound.set_volume(self=self, volume=0, player=self.ambiance_player)
-            self.music_toggle_button.texture = arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_off.png')
+            self.music_toggle_button.texture = arcade.load_texture(
+                ':resources:onscreen_controls/shaded_dark/music_off.png')
             self.active_ambiance = False
         else:
             arcade.Sound.set_volume(self=self, volume=1, player=self.ambiance_player)
-            self.music_toggle_button.texture = arcade.load_texture(':resources:onscreen_controls/shaded_dark/music_on.png')
+            self.music_toggle_button.texture = arcade.load_texture(
+                ':resources:onscreen_controls/shaded_dark/music_on.png')
             self.active_ambiance = True
 
     def on_draw(self):
@@ -356,36 +427,33 @@ class MyGame(arcade.Window):
             self.toggle_music(event=None)
 
         # Player One Actions
-        if key == arcade.key.UP or key == arcade.key.Z:
+        if key == arcade.key.Z and self.player_one_sprite.is_alive:
             if self.player_one_physics_engine.can_jump():
                 self.player_one_sprite.change_y = PLAYER_JUMP_SPEED
                 arcade.play_sound(self.jump_sound)
-        elif key == arcade.key.LEFT or key == arcade.key.Q:
+        elif key == arcade.key.Q and self.player_one_sprite.is_alive:
             self.player_one_sprite.change_x = -PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.RIGHT or key == arcade.key.D:
+        elif key == arcade.key.D and self.player_one_sprite.is_alive:
             self.player_one_sprite.change_x = PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.A:
-            if self.player_one_sprite.character_face_direction == LEFT_FACING:
-                self.player_one_sprite.change_x = -1
-            else:
-                self.player_one_sprite.change_x = 1
-            self.player_one_sprite.attack(self.attack_sound, self.player_two_sprite)
+        elif key == arcade.key.A and self.player_one_sprite.is_alive:
+            self.player_one_sprite.attack(self.player_two_sprite, self.attack_sound, self.hit_sound, self.block_sound)
+        elif key == arcade.key.E and self.player_one_sprite.is_alive:
+            self.player_one_sprite.blocking = True
+
 
         # Player TWO Actions
-        if key == arcade.key.I:
+        if key == arcade.key.I and self.player_two_sprite.is_alive:
             if self.player_two_physics_engine.can_jump():
                 self.player_two_sprite.change_y = PLAYER_JUMP_SPEED
                 arcade.play_sound(self.jump_sound)
-        elif key == arcade.key.J:
+        elif key == arcade.key.J and self.player_two_sprite.is_alive:
             self.player_two_sprite.change_x = -PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.L:
+        elif key == arcade.key.L and self.player_two_sprite.is_alive:
             self.player_two_sprite.change_x = PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.U:
-            if self.player_two_sprite.character_face_direction == LEFT_FACING:
-                self.player_two_sprite.change_x = -1
-            else:
-                self.player_two_sprite.change_x = 1
-            self.player_two_sprite.attack(self.attack_sound, self.player_one_sprite)
+        elif key == arcade.key.U and self.player_two_sprite.is_alive:
+            self.player_two_sprite.attack(self.player_one_sprite, self.attack_sound, self.hit_sound, self.block_sound)
+        elif key == arcade.key.O and self.player_two_sprite.is_alive:
+            self.player_two_sprite.blocking = True
 
     def on_key_release(self, key, modifiers):
         """Called when the user releases a key."""
@@ -397,6 +465,8 @@ class MyGame(arcade.Window):
         elif key == arcade.key.A:
             self.player_one_sprite.change_x = 0
             self.player_one_sprite.attacking = False
+        elif key == arcade.key.E:
+            self.player_one_sprite.blocking = False
 
         if key == arcade.key.J:
             self.player_two_sprite.change_x = 0
@@ -405,6 +475,8 @@ class MyGame(arcade.Window):
         elif key == arcade.key.U:
             self.player_two_sprite.change_x = 0
             self.player_two_sprite.attacking = False
+        elif key == arcade.key.O:
+            self.player_two_sprite.blocking = False
 
     def on_update(self, delta_time):
         """Movement and game logic"""
@@ -419,6 +491,11 @@ class MyGame(arcade.Window):
             self.player_two_sprite.touched = False
             self.player_two_health_bar.pop()
             self.player_two_health_bar.draw()
+
+        # if not self.player_one_sprite.is_alive or not self.player_two_sprite.hp:
+        #     self.ui_manager.add(self.game_over)
+        #     self.ui_manager.draw()
+
 
         # Move the player with the physics engine
         self.player_one_physics_engine.update()
