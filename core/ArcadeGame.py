@@ -204,6 +204,8 @@ class MyGame(arcade.Window):
         super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
 
         # Our Scene Object
+        self.ia_am = None
+        self.ia_env = None
         self.scene = None
 
         # Initialize  Ui Manager
@@ -244,14 +246,9 @@ class MyGame(arcade.Window):
     def run_ia(self):
         for i in range(30):
             print('GEN: ', i)
-            self.ia_am.reset()
+
             iteration = 0
-            while not self.ia_am.goal:
-                iteration += 1
-                self.ia_am.best_actions()
-                self.ia_am.apply_actions(self.ia_am.get_alive_agents)
-                # if iteration % 1000 == 0:
-                # print('iteration :', iteration)
+
             print('GEN: ', i, ' - ', iteration, ' iterations')
 
     def setup(self):
@@ -378,6 +375,11 @@ class MyGame(arcade.Window):
             self.player_two_sprite, gravity_constant=GRAVITY, walls=self.scene["Walls"]
         )
 
+        self.ia_env = GameEnvironment(ARENA)
+        # initialize AgentManager
+        self.ia_am = AgentManager(self.ia_env, 2, 80)
+        self.ia_am.reset()
+
     def toggle_music(self, event):
         if self.active_ambiance:
             arcade.Sound.set_volume(self=self, volume=0, player=self.ambiance_player)
@@ -431,10 +433,6 @@ class MyGame(arcade.Window):
             bold=True
         )
 
-        self.ia_env = GameEnvironment(ARENA)
-        # initialize AgentManager
-        self.ia_am = AgentManager(self.ia_env, 2, 80)
-        self.run_ia()
 
         # Hit_box
         # self.player_two_sprite.draw_hit_box(arcade.color.RED)
@@ -501,6 +499,8 @@ class MyGame(arcade.Window):
     def on_update(self, delta_time):
         """Movement and game logic"""
 
+        print("LALALA")
+
         # Remove heart
         if MAX_HP > self.player_one_sprite.hp >= 0 and self.player_one_sprite.touched:
             self.player_one_sprite.touched = False
@@ -521,10 +521,20 @@ class MyGame(arcade.Window):
         self.player_one_physics_engine.update()
         self.player_two_physics_engine.update()
 
+        print(self.ia_am.goal)
+
+
+        if not self.ia_am.goal:
+            self.ia_am.best_actions()
+            self.ia_am.apply_actions(self.ia_am.get_alive_agents)
+            # if iteration % 1000 == 0:
+            # print('iteration :', iteration)
+
         # Update Animations
         self.scene.update_animation(
             delta_time, [LAYER_NAME_PLAYER_ONE, LAYER_NAME_PLAYER_TWO]
         )
+
 
 
 def main():
