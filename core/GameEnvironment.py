@@ -2,7 +2,6 @@
 import time
 
 import pyautogui
-from pynput.keyboard import Controller
 
 from utils.Singleton import Singleton
 import os
@@ -253,7 +252,6 @@ class AgentManager:
         self.__population = population
         self.__health = health
         self.__agents = []
-        self.__keyboard = Controller()
         for i in range(self.__population):
             self.__agents.append(Agent(self.__environment, health, self.__environment.players_pos[i]))
             self.__environment.players = self.__agents
@@ -287,10 +285,6 @@ class AgentManager:
         self.__environment.players = self.__agents
         self.__score = 0
         self.__last_action = None
-
-    @property
-    def get_keyboard(self):
-        return self.__keyboard
 
     # get all alive agents
     @property
