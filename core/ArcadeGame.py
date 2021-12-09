@@ -458,7 +458,6 @@ class MyGame(arcade.Window):
         elif key == arcade.key.E and self.player_one_sprite.is_alive:
             self.player_one_sprite.blocking = True
 
-
         # Player TWO Actions
         if key == arcade.key.I and self.player_two_sprite.is_alive:
             if self.player_two_physics_engine.can_jump():
@@ -499,8 +498,6 @@ class MyGame(arcade.Window):
     def on_update(self, delta_time):
         """Movement and game logic"""
 
-        print("LALALA")
-
         # Remove heart
         if MAX_HP > self.player_one_sprite.hp >= 0 and self.player_one_sprite.touched:
             self.player_one_sprite.touched = False
@@ -519,9 +516,6 @@ class MyGame(arcade.Window):
 
         # Move the player with the physics engine
         self.player_one_physics_engine.update()
-        self.player_two_physics_engine.update()
-
-        print(self.ia_am.goal)
 
 
         if not self.ia_am.goal:
