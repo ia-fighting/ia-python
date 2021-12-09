@@ -316,18 +316,20 @@ class AgentManager:
             #print('Agent ', i, ' action :', agent.actual_action)
             #print('Agent ', i, ' health :', agent.health)
             if agent.is_alive():
-                if agent.actual_action in MOVING_ACTIONS:
+                actual_action = agent.actual_action
+                if actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
-                    self.update_front(agent.actual_action, i)
+                    self.update_front(actual_action, i)
         # Apply others actions
         #print(self.__environment.get_players_state)
         #print(self.__environment.is_near_players(agents[0].state))
         for i in range(len(agents)):
             agent = agents[i]
             if agents[i].is_alive():
-                if agent.actual_action not in MOVING_ACTIONS and agent.actual_action is not None:
+                actual_action = agent.actual_action
+                if actual_action not in MOVING_ACTIONS and actual_action is not None:
                     self.__environment.apply(agent)
-                    self.update_front(agent.actual_action, i)
+                    self.update_front(actual_action, i)
 
     def display(self, generation, iteration, width):
         os.system('cls')

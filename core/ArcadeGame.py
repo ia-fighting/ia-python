@@ -203,12 +203,6 @@ class MyGame(arcade.Window):
         # Call the parent class and set up the window
         super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
 
-        self.ia_env = GameEnvironment(ARENA)
-
-        # initialize AgentManager
-        self.ia_am = AgentManager(self.ia_env, 2, 80)
-        self.run_ia()
-
         # Our Scene Object
         self.scene = None
 
@@ -436,6 +430,11 @@ class MyGame(arcade.Window):
             14,
             bold=True
         )
+
+        self.ia_env = GameEnvironment(ARENA)
+        # initialize AgentManager
+        self.ia_am = AgentManager(self.ia_env, 2, 80)
+        self.run_ia()
 
         # Hit_box
         # self.player_two_sprite.draw_hit_box(arcade.color.RED)
