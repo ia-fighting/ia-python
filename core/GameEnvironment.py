@@ -1,12 +1,10 @@
 # Game environment class
 
-#import pyautogui
 import time
 
 from utils.Singleton import Singleton
 import os
 import arcade
-#from PIL.Image import Image
 from arcade.gui import UIManager
 
 ARENA = """##  *      *     ##"""
@@ -21,6 +19,7 @@ REWARD_BLOCK = -5
 REWARD_WOUND_TARGET = 30
 REWARD_KILL_TARGET = 100
 REWARD_BEING_TOUCH = -20
+REWARD_TOUCH_BLOCKING_TARGET = -2
 REWARD_TOUCH_EMPTY = -2
 
 # Possible actions
@@ -34,11 +33,6 @@ MOVING_ACTIONS = [RIGHT, LEFT]
 PLAYER_1 = {RIGHT: 'D', LEFT: 'Q', PUNCH: 'A', BLOCK: 'E'}
 PLAYER_2 = {RIGHT: 'L', LEFT: 'J', PUNCH: 'U', BLOCK: 'O'}
 
-"""
-ARCADE_KEYS = {'A': 97, 'B': 98, 'C': 99, 'D': 100, 'E': 101, 'F': 102, 'G': 103,
-               'H': 104, 'I': 105, 'J': 106, 'K': 107, 'L': 108, 'M': 109, 'N': 110, 'O': 111,
-               'P': 112, 'Q': 113, 'R': 114, 'S': 115, 'T': 116, 'U': 117, 'V': 118, 'W': 119,
-               'X': 120, 'Y': 121, 'Z': 122}"""
 """
 Platformer Game
 """
@@ -319,63 +313,6 @@ class MyGame(arcade.Window):
         # self.player_two_sprite.draw_hit_box(arcade.color.RED)
         # self.player_one_sprite.draw_hit_box(arcade.color.YELLOW)
 
-    """def on_key_press(self, key, modifiers):
-        //Called whenever a key is pressed.
-        # Gui
-        if key == arcade.key.M:
-            self.toggle_music(event=None)
-
-        # Player One Actions
-        if key == arcade.key.Z and self.player_one_sprite.is_alive:
-            if self.player_one_physics_engine.can_jump():
-                self.player_one_sprite.change_y = PLAYER_JUMP_SPEED
-                arcade.play_sound(self.jump_sound)
-        elif key == arcade.key.Q and self.player_one_sprite.is_alive:
-            self.player_one_sprite.change_x = -PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.D and self.player_one_sprite.is_alive:
-            self.player_one_sprite.change_x = PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.A and self.player_one_sprite.is_alive:
-            self.player_one_sprite.attack(self.player_two_sprite, self.attack_sound, self.hit_sound, self.block_sound)
-        elif key == arcade.key.E and self.player_one_sprite.is_alive:
-            self.player_one_sprite.blocking = True
-
-        # Player TWO Actions
-        if key == arcade.key.I and self.player_two_sprite.is_alive:
-            if self.player_two_physics_engine.can_jump():
-                self.player_two_sprite.change_y = PLAYER_JUMP_SPEED
-                arcade.play_sound(self.jump_sound)
-        elif key == arcade.key.J and self.player_two_sprite.is_alive:
-            self.player_two_sprite.change_x = -PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.L and self.player_two_sprite.is_alive:
-            self.player_two_sprite.change_x = PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.U and self.player_two_sprite.is_alive:
-            self.player_two_sprite.attack(self.player_one_sprite, self.attack_sound, self.hit_sound, self.block_sound)
-        elif key == arcade.key.O and self.player_two_sprite.is_alive:
-            self.player_two_sprite.blocking = True
-
-    def on_key_release(self, key, modifiers):
-        //Called when the user releases a key.
-
-        if key == arcade.key.LEFT or key == arcade.key.Q:
-            self.player_one_sprite.change_x = 0
-        elif key == arcade.key.RIGHT or key == arcade.key.D:
-            self.player_one_sprite.change_x = 0
-        elif key == arcade.key.A:
-            self.player_one_sprite.change_x = 0
-            self.player_one_sprite.attacking = False
-        elif key == arcade.key.E:
-            self.player_one_sprite.blocking = False
-
-        if key == arcade.key.J:
-            self.player_two_sprite.change_x = 0
-        elif key == arcade.key.L:
-            self.player_two_sprite.change_x = 0
-        elif key == arcade.key.U:
-            self.player_two_sprite.change_x = 0
-            self.player_two_sprite.attacking = False
-        elif key == arcade.key.O:
-            self.player_two_sprite.blocking = False"""
-
     def on_update(self, delta_time):
         """Movement and game logic"""
 
@@ -604,9 +541,10 @@ class Agent(arcade.Sprite):
     def _set_health(self, health):
         self.__health = health
 
+    health = property(_get_health, _set_health)
+
     def _get_state(self):
         return self.__state
-
 
     def _get_is_touched(self):
         return self.__is_touched
@@ -620,7 +558,6 @@ class Agent(arcade.Sprite):
         self.__state = state
 
     state = property(_get_state, _set_state)
-    health = property(_get_health, _set_health)
 
     def is_alive(self):
         if self.__health <= 0:
@@ -671,14 +608,17 @@ class Agent(arcade.Sprite):
         arcade.play_sound(ATTACK_SOUND)
         if self.get_distance_between_players(new_state, target.state) == 1:
             if target.actual_action != BLOCK:
-                target.__is_touched = True
+                target.is_touched = True
+                target.score -= REWARD_BEING_TOUCH
                 target.health -= 1
                 arcade.play_sound(HIT_SOUND)
-                reward += REWARD_BEING_TOUCH
+                reward += REWARD_WOUND_TARGET
             else:
                 target.__is_blocking = True
                 arcade.play_sound(BLOCK_SOUND)
-                reward = REWARD_TOUCH_EMPTY
+                reward = REWARD_TOUCH_BLOCKING_TARGET
+        else:
+            reward = REWARD_TOUCH_EMPTY
         return reward
 
     def get_distance_between_players(self, state_agent1, state_agent2):
@@ -828,23 +768,17 @@ class AgentManager:
         # Apply moving actions
         for i in range(len(agents)):
             agent = agents[i]
-            #print('Agent ', i, ' action :', agent.actual_action)
-            #print('Agent ', i, ' health :', agent.health)
             if agent.is_alive():
                 actual_action = agent.actual_action
                 if actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
-                    #self.update_front(actual_action, i)
         # Apply others actions
-        #print(self.__environment.get_players_state)
-        #print(self.__environment.is_near_players(agents[0].state))
         for i in range(len(agents)):
             agent = agents[i]
             if agents[i].is_alive():
                 actual_action = agent.actual_action
                 if actual_action not in MOVING_ACTIONS and actual_action is not None:
                     self.__environment.apply(agent)
-                    #self.update_front(actual_action, i)
 
     def display(self, generation, iteration, width):
         os.system('cls')
@@ -867,39 +801,12 @@ class AgentManager:
             print('Agent ', i, ' action :', self.__agents[i].last_action)
         print()
 
-    """def update_front(self, action, player):
-        if action is not None and type (action) is not NoneType:
-            key = self.retrieve_key_font(action, player)
-            print(key)
-            pyautogui.press(key)
-
-    def retrieve_key_font(self, action, player):
-        if player == 0:
-            return PLAYER_1[action]
-        elif player == 1:
-            return PLAYER_2[action]"""
-
 
 def main():
     """Main function"""
     window = MyGame()
     window.setup()
     arcade.run()
-
-    """for i in range(30):
-        print('GEN: ', i)
-        am.reset()
-        iteration = 0
-        while not am.goal:
-            iteration += 1
-            am.best_actions()
-            am.apply_actions(am.get_alive_agents)
-            #if iteration % 1000 == 0:
-                #print('iteration :', iteration)
-            if (i == 4):
-                time.sleep(0.3)
-                am.display(i, iteration, len(list(map(lambda x: x.strip(), ARENA.strip().split('\n')))[0]))
-        print('GEN: ', i, ' - ', iteration, ' iterations')"""
 
 
 if __name__ == "__main__":
