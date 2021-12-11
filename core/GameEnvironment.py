@@ -1,6 +1,7 @@
 # Game environment class
 
-import pyautogui
+#import pyautogui
+import time
 
 from utils.Singleton import Singleton
 import os
@@ -8,7 +9,7 @@ import arcade
 #from PIL.Image import Image
 from arcade.gui import UIManager
 
-ARENA = """##*      *##"""
+ARENA = """##  *      *     ##"""
 
 PLAYER = '*'
 WALL = '#'
@@ -142,7 +143,7 @@ class MyGame(arcade.Window):
         self.ambiance_player = arcade.play_sound(AMBIANCE_SOUND, 0.8, 0.0, True)
         self.ia_env = GameEnvironment(ARENA)
         # initialize AgentManager
-        self.ia_am = AgentManager(self.ia_env, 2, 80)
+        self.ia_am = AgentManager(self.ia_env, 2, MAX_HP)
 
         # Load the background image. Do this in the setup so we don't keep reloading it all the time.
         # Image from:
@@ -394,10 +395,12 @@ class MyGame(arcade.Window):
 
         # Move the player with the physics engine
         self.player_one_physics_engine.update()
+        self.player_two_physics_engine.update()
 
         if not self.ia_am.goal:
             self.ia_am.best_actions()
             self.ia_am.apply_actions(self.ia_am.get_alive_agents)
+            time.sleep(0.1)
 
         # Update Animations
         self.scene.update_animation(
@@ -778,7 +781,7 @@ class AgentManager:
     def is_only_one_agent_alive(self):
         count = 0
         for a in self.__agents:
-            if a.is_alive():
+            if a.is_alive:
                 count += 1
         # if count superior to 1, there is more than one agent alive
         if count > 1:
@@ -806,7 +809,7 @@ class AgentManager:
     def get_alive_agents(self):
         alive_agents = []
         for a in self.__agents:
-            if a.is_alive():
+            if a.is_alive:
                 alive_agents.append(a)
         return alive_agents
 
@@ -817,7 +820,7 @@ class AgentManager:
     # Best action for each agent
     def best_actions(self):
         for a in self.__agents:
-            if a.is_alive():
+            if a.is_alive:
                 a.best_action(self.__environment)
 
     def apply_actions(self, agents):
