@@ -378,13 +378,13 @@ class MyGame(arcade.Window):
         """Movement and game logic"""
 
         # Remove heart
-        if MAX_HP > self.player_one_sprite.health >= 0 and self.player_one_sprite.touched:
-            self.player_one_sprite.touched = False
+        if MAX_HP > self.player_one_sprite.health >= 0 and self.player_one_sprite.is_touched:
+            self.player_one_sprite.is_touched = False
             self.player_one_health_bar.pop()
             self.player_one_health_bar.draw()
 
-        if MAX_HP > self.player_two_sprite.health >= 0 and self.player_two_sprite.touched:
-            self.player_two_sprite.touched = False
+        if MAX_HP > self.player_two_sprite.health >= 0 and self.player_two_sprite.is_touched:
+            self.player_two_sprite.is_touched = False
             self.player_two_health_bar.pop()
             self.player_two_health_bar.draw()
 
@@ -470,12 +470,13 @@ class GameEnvironment(Singleton):
 
     def attack_players(self, agent, new_state):
         reward = 0
-        for target in self.other_players_state(new_state):
-            reward = agent.attack(target)
-            if target.health <= 0:
-                self.__players.remove(agent)
-                reward += REWARD_KILL_TARGET
-                target.is_alive = False
+        for target in self.players:
+            if target != agent:
+                reward = agent.attack(new_state, target)
+                if target.health <= 0:
+                    self.__players.remove(agent)
+                    reward += REWARD_KILL_TARGET
+                    target.is_alive = False
         return reward
 
     #list of player state
@@ -602,6 +603,15 @@ class Agent(arcade.Sprite):
     def _get_state(self):
         return self.__state
 
+
+    def _get_is_touched(self):
+        return self.__is_touched
+
+    def _set_is_touched(self, is_touched):
+        self.__is_touched = is_touched
+
+    is_touched = property(_get_is_touched, _set_is_touched)
+
     def _set_state(self, state):
         self.__state = state
 
@@ -658,7 +668,7 @@ class Agent(arcade.Sprite):
         if self.get_distance_between_players(new_state, target.state) == 1:
             if target.actual_action != BLOCK:
                 target.__is_touched = True
-                target.hp -= 1
+                target.health -= 1
                 arcade.play_sound(HIT_SOUND)
                 reward += REWARD_BEING_TOUCH
             else:
@@ -820,7 +830,7 @@ class AgentManager:
                 actual_action = agent.actual_action
                 if actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
-                    self.update_front(actual_action, i)
+                    #self.update_front(actual_action, i)
         # Apply others actions
         #print(self.__environment.get_players_state)
         #print(self.__environment.is_near_players(agents[0].state))
@@ -830,7 +840,7 @@ class AgentManager:
                 actual_action = agent.actual_action
                 if actual_action not in MOVING_ACTIONS and actual_action is not None:
                     self.__environment.apply(agent)
-                    self.update_front(actual_action, i)
+                    #self.update_front(actual_action, i)
 
     def display(self, generation, iteration, width):
         os.system('cls')
@@ -853,8 +863,8 @@ class AgentManager:
             print('Agent ', i, ' action :', self.__agents[i].last_action)
         print()
 
-    def update_front(self, action, player):
-        if action is not None:
+    """def update_front(self, action, player):
+        if action is not None and type (action) is not NoneType:
             key = self.retrieve_key_font(action, player)
             print(key)
             pyautogui.press(key)
@@ -863,7 +873,7 @@ class AgentManager:
         if player == 0:
             return PLAYER_1[action]
         elif player == 1:
-            return PLAYER_2[action]
+            return PLAYER_2[action]"""
 
 
 def main():
