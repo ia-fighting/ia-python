@@ -150,7 +150,8 @@ class MyGame(arcade.Window):
         self.background = arcade.load_texture(f"{SPRITES_PATH}/BG.png")
 
         # Set up the player one, specifically placing it at these coordinates.
-        self.player_one_sprite = self.ia_am.get_agents()[0]
+        # retrieve first agent of the ia_am
+        self.player_one_sprite = self.ia_am.agents[0]
         self.player_one_sprite.center_x = PLAYER_ONE_START_X
         self.player_one_sprite.center_y = PLAYER_ONE_START_Y
         self.scene.add_sprite(LAYER_NAME_PLAYER_ONE, self.player_one_sprite)
@@ -160,7 +161,8 @@ class MyGame(arcade.Window):
         self.player_two_health_bar = arcade.SpriteList(use_spatial_hash=True)
 
         # Set up the player two, specifically placing it at these coordinates.
-        self.player_two_sprite = self.ia_am.get_agents()[1]
+        self.player_two_sprite = self.ia_am.agents[1]
+
         self.player_two_sprite.center_x = PLAYER_TWO_START_X
         self.player_two_sprite.center_y = PLAYER_TWO_START_Y
         self.scene.add_sprite(LAYER_NAME_PLAYER_TWO, self.player_two_sprite)
@@ -210,13 +212,13 @@ class MyGame(arcade.Window):
         player_two_preview.position = coordinate_player_two_preview
         self.wall_list.append(player_two_preview)
 
-        for i in range(1, self.player_one_sprite.hp + 1):
+        for i in range(1, self.player_one_sprite.health + 1):
             coordinate_heart = [60 + i * 30, 600]
             heart = arcade.Sprite(f"{SPRITES_PATH}/objects/heart.png", 0.05)
             heart.position = coordinate_heart
             self.player_one_health_bar.append(heart)
 
-        for i in range(1, self.player_two_sprite.hp + 1):
+        for i in range(1, self.player_two_sprite.health + 1):
             coordinate_heart = [940 - i * 30, 600]
             heart = arcade.Sprite(f"{SPRITES_PATH}/objects/heart.png", 0.05)
             heart.position = coordinate_heart
@@ -376,12 +378,12 @@ class MyGame(arcade.Window):
         """Movement and game logic"""
 
         # Remove heart
-        if MAX_HP > self.player_one_sprite.hp >= 0 and self.player_one_sprite.touched:
+        if MAX_HP > self.player_one_sprite.health >= 0 and self.player_one_sprite.touched:
             self.player_one_sprite.touched = False
             self.player_one_health_bar.pop()
             self.player_one_health_bar.draw()
 
-        if MAX_HP > self.player_two_sprite.hp >= 0 and self.player_two_sprite.touched:
+        if MAX_HP > self.player_two_sprite.health >= 0 and self.player_two_sprite.touched:
             self.player_two_sprite.touched = False
             self.player_two_health_bar.pop()
             self.player_two_health_bar.draw()
@@ -773,9 +775,13 @@ class AgentManager:
             return False
         return True
 
-    @property
-    def get_agents(self):
+    def _get_agents(self):
         return self.__agents
+
+    def _set_agents(self, agents):
+        self.__agents = agents
+
+    agents = property(_get_agents, _set_agents)
 
     @property
     def get_agents_health(self):
