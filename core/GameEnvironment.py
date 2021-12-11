@@ -609,7 +609,7 @@ class Agent(arcade.Sprite):
         if self.get_distance_between_players(new_state, target.state) == 1:
             if target.actual_action != BLOCK:
                 target.is_touched = True
-                target.score -= REWARD_BEING_TOUCH
+                target.__score -= REWARD_BEING_TOUCH
                 target.health -= 1
                 arcade.play_sound(HIT_SOUND)
                 reward += REWARD_WOUND_TARGET
@@ -768,14 +768,14 @@ class AgentManager:
         # Apply moving actions
         for i in range(len(agents)):
             agent = agents[i]
-            if agent.is_alive():
+            if agent.is_alive:
                 actual_action = agent.actual_action
                 if actual_action in MOVING_ACTIONS:
                     self.__environment.apply(agents[i])
         # Apply others actions
         for i in range(len(agents)):
             agent = agents[i]
-            if agents[i].is_alive():
+            if agents[i].is_alive:
                 actual_action = agent.actual_action
                 if actual_action not in MOVING_ACTIONS and actual_action is not None:
                     self.__environment.apply(agent)
