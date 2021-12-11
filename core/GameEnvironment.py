@@ -7,7 +7,7 @@ import os
 import arcade
 from arcade.gui import UIManager
 
-ARENA = """##  *      *     ##"""
+ARENA = """#  *      *     #"""
 
 PLAYER = '*'
 WALL = '#'
@@ -30,8 +30,8 @@ BLOCK = 'B'
 ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
 MOVING_ACTIONS = [RIGHT, LEFT]
 
-PLAYER_1 = {RIGHT: 'D', LEFT: 'Q', PUNCH: 'A', BLOCK: 'E'}
-PLAYER_2 = {RIGHT: 'L', LEFT: 'J', PUNCH: 'U', BLOCK: 'O'}
+PLAYER_1 = '1'
+PLAYER_2 = '2'
 
 """
 Platformer Game
@@ -52,10 +52,9 @@ PLAYER_MOVEMENT_SPEED = 7
 GRAVITY = 2
 PLAYER_JUMP_SPEED = 30
 
-PLAYER_ONE_START_X = SPRITE_PIXEL_SIZE * TILE_SCALING * 5
 PLAYER_ONE_START_Y = SPRITE_PIXEL_SIZE * TILE_SCALING * 3
 
-PLAYER_TWO_START_X = SPRITE_PIXEL_SIZE * TILE_SCALING * 10
+PLAYER_START_X = SPRITE_PIXEL_SIZE * TILE_SCALING
 PLAYER_TWO_START_Y = SPRITE_PIXEL_SIZE * TILE_SCALING * 3
 
 MAX_HP = 10
@@ -102,8 +101,9 @@ class MyGame(arcade.Window):
         super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
 
         # Our Scene Object
-        self.ia_am = None
-        self.ia_env = None
+        self.ia_env = GameEnvironment(ARENA)
+        # initialize AgentManager
+        self.ia_am = AgentManager(self.ia_env, 2, MAX_HP)
         self.scene = None
 
         # Initialize  Ui Manager
@@ -114,13 +114,11 @@ class MyGame(arcade.Window):
         self.background = None
 
         self.active_ambiance = True
-        self.ambiance_player = None
 
         # Separate variable that holds the players sprite
         self.player_one_sprite = None
         self.player_two_sprite = None
 
-        #
         self.player_one_health_bar = None
         self.player_two_health_bar = None
         self.game_over = None
@@ -128,6 +126,7 @@ class MyGame(arcade.Window):
         self.physics_engine = None
         self.wall_list = None
         self.music_toggle_button = None
+        self.ambiance_player = arcade.play_sound(AMBIANCE_SOUND, 0.8, 0.0, True)
 
     def setup(self):
         """Set up the game here. Call this function to restart the game."""
@@ -135,33 +134,24 @@ class MyGame(arcade.Window):
         # Initialize Scene
         self.scene = arcade.Scene()
         self.bone = None
-        self.ambiance_player = arcade.play_sound(AMBIANCE_SOUND, 0.8, 0.0, True)
-        self.ia_env = GameEnvironment(ARENA)
-        # initialize AgentManager
-        self.ia_am = AgentManager(self.ia_env, 2, MAX_HP)
 
-        # Load the background image. Do this in the setup so we don't keep reloading it all the time.
-        # Image from:
-        # https://wallpaper-gallery.net/single/free-background-images/free-background-images-22.html
         self.background = arcade.load_texture(f"{SPRITES_PATH}/BG.png")
 
-        # Set up the player one, specifically placing it at these coordinates.
         # retrieve first agent of the ia_am
         self.player_one_sprite = self.ia_am.agents[0]
-        self.player_one_sprite.center_x = PLAYER_ONE_START_X
+        self.player_one_sprite.center_x = self.player_one_sprite.state[1] * PLAYER_START_X
         self.player_one_sprite.center_y = PLAYER_ONE_START_Y
         self.scene.add_sprite(LAYER_NAME_PLAYER_ONE, self.player_one_sprite)
+
+        # Set up the player two, specifically placing it at these coordinates.
+        self.player_two_sprite = self.ia_am.agents[1]
+        self.player_two_sprite.center_x = self.player_two_sprite.state[1] * PLAYER_START_X
+        self.player_two_sprite.center_y = PLAYER_TWO_START_Y
+        self.scene.add_sprite(LAYER_NAME_PLAYER_TWO, self.player_two_sprite)
 
         self.wall_list = arcade.SpriteList(use_spatial_hash=True)
         self.player_one_health_bar = arcade.SpriteList(use_spatial_hash=True)
         self.player_two_health_bar = arcade.SpriteList(use_spatial_hash=True)
-
-        # Set up the player two, specifically placing it at these coordinates.
-        self.player_two_sprite = self.ia_am.agents[1]
-
-        self.player_two_sprite.center_x = PLAYER_TWO_START_X
-        self.player_two_sprite.center_y = PLAYER_TWO_START_Y
-        self.scene.add_sprite(LAYER_NAME_PLAYER_TWO, self.player_two_sprite)
 
         # This shows using a loop to place multiple sprites horizontally
         tile_source = f"{SPRITES_PATH}/tiles/tile2.png"
@@ -315,7 +305,6 @@ class MyGame(arcade.Window):
 
     def on_update(self, delta_time):
         """Movement and game logic"""
-
         # Remove heart
         if MAX_HP > self.player_one_sprite.health >= 0 and self.player_one_sprite.is_touched:
             self.player_one_sprite.is_touched = False
@@ -327,6 +316,15 @@ class MyGame(arcade.Window):
             self.player_two_health_bar.pop()
             self.player_two_health_bar.draw()
 
+        self.player_one_sprite = self.ia_am.agents[0]
+        self.player_one_sprite.center_x = self.player_one_sprite.state[1] * PLAYER_START_X
+        self.player_one_sprite.center_y = PLAYER_ONE_START_Y
+
+        # Set up the player two, specifically placing it at these coordinates.
+        self.player_two_sprite = self.ia_am.agents[1]
+        self.player_two_sprite.center_x = self.player_two_sprite.state[1] * PLAYER_START_X
+        self.player_two_sprite.center_y = PLAYER_TWO_START_Y
+
         # if not self.player_one_sprite.is_alive or not self.player_two_sprite.hp:
         #     self.ui_manager.add(self.game_over)
         #     self.ui_manager.draw()
@@ -335,15 +333,15 @@ class MyGame(arcade.Window):
         self.player_one_physics_engine.update()
         self.player_two_physics_engine.update()
 
-        if not self.ia_am.goal:
-            self.ia_am.best_actions()
-            self.ia_am.apply_actions(self.ia_am.get_alive_agents)
-            time.sleep(0.1)
-
         # Update Animations
         self.scene.update_animation(
             delta_time, [LAYER_NAME_PLAYER_ONE, LAYER_NAME_PLAYER_TWO]
         )
+
+        if not self.ia_am.goal:
+            self.ia_am.best_actions()
+            self.ia_am.apply_actions(self.ia_am.get_alive_agents)
+            time.sleep(0.1)
 
 
 class GameEnvironment(Singleton):
@@ -361,29 +359,16 @@ class GameEnvironment(Singleton):
                     self.__players_pos.append((row, col))
         self.__players_pos_start = self.__players_pos.copy()
 
-    @property
-    def players_pos(self):
-        return self.__players_pos
-
-    def _get_players(self):
-        return self.__players
-
-    def _set_players(self, players):
-        self.__players = players
-
-    players = property(_get_players, _set_players)
-
-    @property
-    def players_pos_start(self):
-        return self.__players_pos_start
-
-    @property
-    def states(self):
-        return self.__states.keys()
-
-    @property
-    def all_states(self):
-        return self.__states
+    def attack_players(self, agent, new_state):
+        reward = 0
+        for target in self.players:
+            if target != agent:
+                reward = agent.attack(new_state, target)
+                if target.health <= 0:
+                    self.players.remove(agent)
+                    reward += REWARD_KILL_TARGET
+                    target.is_alive = False
+        return reward
 
     def is_near_players(self, state):
         if state[1] < len(ARENA) - 1:
@@ -408,22 +393,6 @@ class GameEnvironment(Singleton):
         for agent in self.__players:
             if agent.state == state:
                 return agent
-
-    def attack_players(self, agent, new_state):
-        reward = 0
-        for target in self.players:
-            if target != agent:
-                reward = agent.attack(new_state, target)
-                if target.health <= 0:
-                    self.__players.remove(agent)
-                    reward += REWARD_KILL_TARGET
-                    target.is_alive = False
-        return reward
-
-    #list of player state
-    @property
-    def get_players_state(self):
-        return [player.state for player in self.players]
 
     def other_players_state(self, new_state):
         players_state = self.get_players_state.copy()
@@ -456,6 +425,35 @@ class GameEnvironment(Singleton):
             reward = REWARD_OUT
         agent.update_ia(action, state, has_neighbours, reward)
         return reward
+
+    @property
+    def players_pos(self):
+        return self.__players_pos
+
+    def _get_players(self):
+        return self.__players
+
+    def _set_players(self, players):
+        self.__players = players
+
+    players = property(_get_players, _set_players)
+
+    @property
+    def players_pos_start(self):
+        return self.__players_pos_start
+
+    @property
+    def states(self):
+        return self.__states.keys()
+
+    @property
+    def all_states(self):
+        return self.__states
+
+    #list of player state
+    @property
+    def get_players_state(self):
+        return [player.state for player in self.players]
 
 
 class Agent(arcade.Sprite):
@@ -534,44 +532,6 @@ class Agent(arcade.Sprite):
         # Set the initial texture
         if not self.__is_attacking:
             self.texture = self.idle_texture_pair[0]
-
-    def _get_health(self):
-        return self.__health
-
-    def _set_health(self, health):
-        self.__health = health
-
-    health = property(_get_health, _set_health)
-
-    def _get_state(self):
-        return self.__state
-
-    def _get_is_touched(self):
-        return self.__is_touched
-
-    def _set_is_touched(self, is_touched):
-        self.__is_touched = is_touched
-
-    is_touched = property(_get_is_touched, _set_is_touched)
-
-    def _set_state(self, state):
-        self.__state = state
-
-    state = property(_get_state, _set_state)
-
-    def is_alive(self):
-        if self.__health <= 0:
-            self.__is_alive = False
-            return False
-        return True
-
-    def _get_actual_action(self):
-        return self.__actual_action
-
-    def _set_actual_action(self, actual_action):
-        self.__actual_action = actual_action
-
-    actual_action = property(_get_actual_action, _set_actual_action)
 
     def update_ia(self, action, new_state, has_neighbours, reward):
         # QTable update
@@ -656,7 +616,7 @@ class Agent(arcade.Sprite):
                 self.__face_direction
             ]
             return
-        elif not self.is_alive and not self.__is_down and self.change_x == 0:
+        elif not self.__is_alive and not self.__is_down and self.change_x == 0:
             self.__cur_dead_texture += 1
             if self.__cur_dead_texture > 10:
                 self.__is_down = True
@@ -665,7 +625,7 @@ class Agent(arcade.Sprite):
             ]
             return
         # Idle animation
-        elif self.change_x == 0 and self.is_alive:
+        elif self.change_x == 0 and self.__is_alive:
             self.__cur_idle_texture += 1
             if self.__cur_idle_texture > 14:
                 self.__cur_idle_texture = 0
@@ -697,6 +657,46 @@ class Agent(arcade.Sprite):
     @property
     def last_action(self):
         return self.__last_action
+
+    def _get_health(self):
+        return self.__health
+
+    def _set_health(self, health):
+        self.__health = health
+
+    health = property(_get_health, _set_health)
+
+    def _get_is_alive(self):
+        return self.__is_alive
+
+    def _set_is_alive(self, is_alive):
+        self.__is_alive = is_alive
+
+    is_alive = property(_get_is_alive, _set_is_alive)
+
+    def _get_state(self):
+        return self.__state
+
+    def _get_is_touched(self):
+        return self.__is_touched
+
+    def _set_is_touched(self, is_touched):
+        self.__is_touched = is_touched
+
+    is_touched = property(_get_is_touched, _set_is_touched)
+
+    def _set_state(self, state):
+        self.__state = state
+
+    state = property(_get_state, _set_state)
+
+    def _get_actual_action(self):
+        return self.__actual_action
+
+    def _set_actual_action(self, actual_action):
+        self.__actual_action = actual_action
+
+    actual_action = property(_get_actual_action, _set_actual_action)
 
 
 class AgentManager:
