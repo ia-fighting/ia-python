@@ -1,12 +1,11 @@
 # Game environment class
-import time
 
 import pyautogui
 
 from utils.Singleton import Singleton
 import os
 import arcade
-from PIL.Image import Image
+#from PIL.Image import Image
 from arcade.gui import UIManager
 
 ARENA = """##*      *##"""
@@ -31,8 +30,8 @@ BLOCK = 'B'
 ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
 MOVING_ACTIONS = [RIGHT, LEFT]
 
-PLAYER_1 = {RIGHT: 'D', LEFT: 'Q', PUNCH:'A', BLOCK:'E'}
-PLAYER_2 = {RIGHT: 'L', LEFT: 'J', PUNCH:'U', BLOCK:'O'}
+PLAYER_1 = {RIGHT: 'D', LEFT: 'Q', PUNCH: 'A', BLOCK: 'E'}
+PLAYER_2 = {RIGHT: 'L', LEFT: 'J', PUNCH: 'U', BLOCK: 'O'}
 
 ARCADE_KEYS = {'A': 97, 'B': 98, 'C': 99, 'D': 100, 'E': 101, 'F': 102, 'G': 103, 'H': 104, 'I': 105, 'J': 106, 'K': 107, 'L': 108, 'M': 109, 'N': 110, 'O': 111, 'P': 112, 'Q': 113, 'R': 114, 'S': 115, 'T': 116, 'U': 117, 'V': 118, 'W': 119, 'X': 120, 'Y': 121, 'Z': 122}
 """
@@ -70,6 +69,18 @@ LAYER_NAME_LADDERS = "Ladders"
 LAYER_NAME_PLAYER_ONE = "PlayerOne"
 LAYER_NAME_PLAYER_TWO = "PlayerTwo"
 
+SPRITES_PATH = "./asset/sprites/png/"
+MAIN_PATH = f"./asset/sprites/png/"
+
+# Load sounds
+SOUNDS_PATH = "./asset/sounds/"
+
+AMBIANCE_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/ambiance.mp3")
+ATTACK_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/attack_short.mp3")
+HIT_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/hit.mp3")
+BLOCK_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/block.mp3")
+JUMP_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/jump.mp3")
+
 
 def load_texture_pair(filename):
     """
@@ -79,149 +90,6 @@ def load_texture_pair(filename):
         arcade.load_texture(filename),
         arcade.load_texture(filename, flipped_horizontally=True),
     ]
-
-class PlayerCharacter(arcade.Sprite):
-    """Player Sprite"""
-
-    def __init__(self, sprites, face_direction):
-
-        # Set up parent class
-        super().__init__()
-
-        # Default to face-right
-        self.character_face_direction = face_direction
-
-        self.hp = MAX_HP
-        self.score = 0
-
-        # Used for flipping between image sequences
-        self.cur_texture = 0
-        self.cur_attack_texture = 0
-        self.cur_idle_texture = 0
-        self.cur_dead_texture = 0
-        self.scale = CHARACTER_SCALING
-
-        # Track our state
-        self.is_on_ladder = False
-        self.attacking = False
-        self.touched = False
-        self.blocking = False
-        self.is_dead = False
-        self.is_alive = True
-        self.is_down = False
-
-        # --- Load Textures ---
-        main_path = f"./asset/sprites/png/{sprites}"
-
-        # Load textures for idle standing
-        self.idle_texture_pair = load_texture_pair(f"{main_path}/Idle1.png")
-        self.jump_texture_pair = load_texture_pair(f"{main_path}/Dead3.png")
-        self.fall_texture_pair = load_texture_pair(f"{main_path}/Idle1.png")
-        self.block_texture_pair = load_texture_pair(f"{main_path}/Dead1.png")
-
-        # Load textures for walking
-        self.walk_textures = []
-        for i in range(1, 10):
-            walk_texture = load_texture_pair(f"{main_path}/Walk{i}.png")
-            self.walk_textures.append(walk_texture)
-
-        # Load textures for attacking
-        self.attack_textures = []
-        for i in range(1, 8):
-            attack_texture = load_texture_pair(f"{main_path}/Attack{i}.png")
-            self.attack_textures.append(attack_texture)
-
-        self.idle_textures = []
-        for i in range(1, 16):
-            idle_texture = load_texture_pair(f"{main_path}/Idle{i}.png")
-            self.idle_textures.append(idle_texture)
-
-        self.dead_textures = []
-        for i in range(1, 13):
-            dead_texture = load_texture_pair(f"{main_path}/Dead{i}.png")
-            self.dead_textures.append(dead_texture)
-
-        # Set the initial texture
-        if not self.attacking:
-            self.texture = self.idle_texture_pair[0]
-
-    def attack(self, target, attack_sound, hit_sound, block_sound):
-        arcade.play_sound(attack_sound)
-        self.attacking = True
-        if arcade.get_distance_between_sprites(self, target) < 65:
-            if target.blocking:
-                arcade.play_sound(block_sound)
-            else:
-                target.touched = True
-                target.hp -= 1
-                arcade.play_sound(hit_sound)
-
-            # Todo remove
-            self.score += 1
-
-        if target.hp <=0:
-            target.is_alive = False
-
-    def update_animation(self, delta_time: float = 1 / 60):
-
-        # Figure out if we need to flip face left or right
-        if self.change_x < 0 and self.character_face_direction == RIGHT_FACING:
-            self.character_face_direction = LEFT_FACING
-        elif self.change_x > 0 and self.character_face_direction == LEFT_FACING:
-            self.character_face_direction = RIGHT_FACING
-
-        # Jumping animation
-        if self.change_y > 0 and not self.is_on_ladder:
-            self.texture = self.jump_texture_pair[self.character_face_direction]
-            return
-        elif self.change_y < 0 and not self.is_on_ladder:
-            self.texture = self.fall_texture_pair[self.character_face_direction]
-            return
-
-        # Block animation
-        if self.blocking == True:
-            self.texture = self.block_texture_pair[self.character_face_direction]
-            return
-
-        # Attacking animation
-        if self.attacking and self.change_x == 0:
-            self.cur_attack_texture = 0
-            self.cur_attack_texture += 1
-            if self.cur_attack_texture > 8:
-                self.cur_attack_texture = 0
-                self.attacking = False
-            self.texture = self.attack_textures[self.cur_attack_texture][
-                self.character_face_direction
-            ]
-            return
-        elif not self.is_alive and not self.is_down and self.change_x == 0:
-            self.cur_dead_texture += 1
-            if self.cur_dead_texture > 10:
-                self.is_down = True
-            self.texture = self.dead_textures[self.cur_dead_texture][
-                self.character_face_direction
-            ]
-            return
-        # Idle animation
-        elif self.change_x == 0 and self.is_alive:
-            self.cur_idle_texture += 1
-            if self.cur_idle_texture > 14:
-                self.cur_idle_texture = 0
-            self.texture = self.idle_textures[self.cur_idle_texture][
-                self.character_face_direction
-            ]
-            return
-
-
-        # Walking animation
-        if not self.is_down:
-            self.cur_texture += 1
-            if self.cur_texture > 7:
-                self.cur_texture = 0
-            self.texture = self.walk_textures[self.cur_texture][
-                self.character_face_direction
-            ]
-
 
 class MyGame(arcade.Window):
     """
@@ -255,50 +123,30 @@ class MyGame(arcade.Window):
         #
         self.player_one_health_bar = None
         self.player_two_health_bar = None
-
         self.game_over = None
-
         # Our physics engine
         self.physics_engine = None
-
         self.wall_list = None
-
         self.music_toggle_button = None
-
-        # Load sounds
-        sounds_path = "./asset/sounds/"
-        self.jump_sound = arcade.load_sound(f"{sounds_path}/jump.mp3")
-        self.attack_sound = arcade.load_sound(f"{sounds_path}/attack_short.mp3")
-        self.ambiance = arcade.load_sound(f"{sounds_path}/ambiance.mp3")
-        self.block_sound = arcade.load_sound(f"{sounds_path}/block.mp3")
-        self.hit_sound = arcade.load_sound(f"{sounds_path}/hit.mp3")
-
-    def run_ia(self):
-        for i in range(30):
-            print('GEN: ', i)
-
-            iteration = 0
-
-            print('GEN: ', i, ' - ', iteration, ' iterations')
 
     def setup(self):
         """Set up the game here. Call this function to restart the game."""
 
         # Initialize Scene
         self.scene = arcade.Scene()
-
         self.bone = None
+        self.ambiance_player = arcade.play_sound(AMBIANCE_SOUND, 0.8, 0.0, True)
+        self.ia_env = GameEnvironment(ARENA)
+        # initialize AgentManager
+        self.ia_am = AgentManager(self.ia_env, 2, 80)
 
-        self.ambiance_player = arcade.play_sound(self.ambiance, 0.8, 0.0, True)
-
-        sprites_path = "./asset/sprites/png/"
         # Load the background image. Do this in the setup so we don't keep reloading it all the time.
         # Image from:
         # https://wallpaper-gallery.net/single/free-background-images/free-background-images-22.html
-        self.background = arcade.load_texture(f"{sprites_path}/BG.png")
+        self.background = arcade.load_texture(f"{SPRITES_PATH}/BG.png")
 
         # Set up the player one, specifically placing it at these coordinates.
-        self.player_one_sprite = PlayerCharacter('male', RIGHT_FACING)
+        self.player_one_sprite = self.ia_am.get_agents()[0]
         self.player_one_sprite.center_x = PLAYER_ONE_START_X
         self.player_one_sprite.center_y = PLAYER_ONE_START_Y
         self.scene.add_sprite(LAYER_NAME_PLAYER_ONE, self.player_one_sprite)
@@ -308,13 +156,13 @@ class MyGame(arcade.Window):
         self.player_two_health_bar = arcade.SpriteList(use_spatial_hash=True)
 
         # Set up the player two, specifically placing it at these coordinates.
-        self.player_two_sprite = PlayerCharacter('female', LEFT_FACING)
+        self.player_two_sprite = self.ia_am.get_agents()[1]
         self.player_two_sprite.center_x = PLAYER_TWO_START_X
         self.player_two_sprite.center_y = PLAYER_TWO_START_Y
         self.scene.add_sprite(LAYER_NAME_PLAYER_TWO, self.player_two_sprite)
 
         # This shows using a loop to place multiple sprites horizontally
-        tile_source = f"{sprites_path}/tiles/tile2.png"
+        tile_source = f"{SPRITES_PATH}/tiles/tile2.png"
         for x in range(0, 1250, 64):
             wall = arcade.Sprite(tile_source, 1)
             wall.center_x = x
@@ -322,51 +170,51 @@ class MyGame(arcade.Window):
             self.scene.add_sprite("Walls", wall)
 
         coordinate_tree = [512, 304]
-        tree = arcade.Sprite(f"{sprites_path}/objects/tree.png", 1.5)
+        tree = arcade.Sprite(f"{SPRITES_PATH}/objects/tree.png", 1.5)
         tree.position = coordinate_tree
         self.wall_list.append(tree)
 
         coordinate_tomb = [768, 168]
-        tomb = arcade.Sprite(f"{sprites_path}/objects/tomb_stone1.png", 1.5)
+        tomb = arcade.Sprite(f"{SPRITES_PATH}/objects/tomb_stone1.png", 1.5)
         tomb.position = coordinate_tomb
         self.wall_list.append(tomb)
 
         coordinate_arrow = [156, 172]
-        arrow = arcade.Sprite(f"{sprites_path}/objects/arrow_sign.png", 1)
+        arrow = arcade.Sprite(f"{SPRITES_PATH}/objects/arrow_sign.png", 1)
         arrow.position = coordinate_arrow
         self.wall_list.append(arrow)
 
         coordinate_skeleton = [456, 140]
-        skeleton = arcade.Sprite(f"{sprites_path}/objects/skeleton.png", 0.5)
+        skeleton = arcade.Sprite(f"{SPRITES_PATH}/objects/skeleton.png", 0.5)
         skeleton.position = coordinate_skeleton
         self.wall_list.append(skeleton)
 
         # Create the ground
         coordinate_bone = [755, 80]
-        self.bone = arcade.Sprite(f"{sprites_path}/tiles/bone3.png", 0.7)
+        self.bone = arcade.Sprite(f"{SPRITES_PATH}/tiles/bone3.png", 0.7)
         self.bone.position = coordinate_bone
 
         # Create the player one preview
         coordinate_player_one_preview = [35, 590]
-        player_one_preview = arcade.Sprite(f"{sprites_path}/male/preview.png", 0.2)
+        player_one_preview = arcade.Sprite(f"{SPRITES_PATH}/male/preview.png", 0.2)
         player_one_preview.position = coordinate_player_one_preview
         self.wall_list.append(player_one_preview)
 
         # Create the player one preview
         coordinate_player_two_preview = [965, 590]
-        player_two_preview = arcade.Sprite(f"{sprites_path}/female/preview.png", 0.2)
+        player_two_preview = arcade.Sprite(f"{SPRITES_PATH}/female/preview.png", 0.2)
         player_two_preview.position = coordinate_player_two_preview
         self.wall_list.append(player_two_preview)
 
         for i in range(1, self.player_one_sprite.hp + 1):
             coordinate_heart = [60 + i * 30, 600]
-            heart = arcade.Sprite(f"{sprites_path}/objects/heart.png", 0.05)
+            heart = arcade.Sprite(f"{SPRITES_PATH}/objects/heart.png", 0.05)
             heart.position = coordinate_heart
             self.player_one_health_bar.append(heart)
 
         for i in range(1, self.player_two_sprite.hp + 1):
             coordinate_heart = [940 - i * 30, 600]
-            heart = arcade.Sprite(f"{sprites_path}/objects/heart.png", 0.05)
+            heart = arcade.Sprite(f"{SPRITES_PATH}/objects/heart.png", 0.05)
             heart.position = coordinate_heart
             self.player_two_health_bar.append(heart)
 
@@ -381,7 +229,7 @@ class MyGame(arcade.Window):
         self.game_over = arcade.gui.UITextureButton(
             x=400,
             y=500,
-            texture=arcade.load_texture(f"{sprites_path}/objects/game_over.png", 0.5),
+            texture=arcade.load_texture(f"{SPRITES_PATH}/objects/game_over.png", 0.5),
         )
 
         # self.game_over = arcade.gui.UITextArea(
@@ -405,9 +253,6 @@ class MyGame(arcade.Window):
             self.player_two_sprite, gravity_constant=GRAVITY, walls=self.scene["Walls"]
         )
 
-        self.ia_env = GameEnvironment(ARENA)
-        # initialize AgentManager
-        self.ia_am = AgentManager(self.ia_env, 2, 80)
         self.ia_am.reset()
 
     def toggle_music(self, event):
@@ -468,8 +313,8 @@ class MyGame(arcade.Window):
         # self.player_two_sprite.draw_hit_box(arcade.color.RED)
         # self.player_one_sprite.draw_hit_box(arcade.color.YELLOW)
 
-    def on_key_press(self, key, modifiers):
-        """Called whenever a key is pressed."""
+    """def on_key_press(self, key, modifiers):
+        //Called whenever a key is pressed.
         # Gui
         if key == arcade.key.M:
             self.toggle_music(event=None)
@@ -503,7 +348,7 @@ class MyGame(arcade.Window):
             self.player_two_sprite.blocking = True
 
     def on_key_release(self, key, modifiers):
-        """Called when the user releases a key."""
+        //Called when the user releases a key.
 
         if key == arcade.key.LEFT or key == arcade.key.Q:
             self.player_one_sprite.change_x = 0
@@ -523,7 +368,7 @@ class MyGame(arcade.Window):
             self.player_two_sprite.change_x = 0
             self.player_two_sprite.attacking = False
         elif key == arcade.key.O:
-            self.player_two_sprite.blocking = False
+            self.player_two_sprite.blocking = False"""
 
     def on_update(self, delta_time):
         """Movement and game logic"""
@@ -551,8 +396,7 @@ class MyGame(arcade.Window):
         if not self.ia_am.goal:
             self.ia_am.best_actions()
             self.ia_am.apply_actions(self.ia_am.get_alive_agents)
-            # if iteration % 1000 == 0:
-            # print('iteration :', iteration)
+
 
         # Update Animations
         self.scene.update_animation(
@@ -623,20 +467,14 @@ class GameEnvironment(Singleton):
             if agent.state == state:
                 return agent
 
-    def attack_near_players(self, new_state):
+    def attack_players(self, agent, new_state):
         reward = 0
-        for agent in self.__players:
-            if agent.state == (new_state[0], new_state[1] - 1) \
-                    or agent.state == (new_state[0], new_state[1] + 1):
-                if agent.actual_action != BLOCK:
-                    agent.health = agent.health - 20
-                    #print("{} has been wounded".format(agent.health))
-                    reward += REWARD_BEING_TOUCH
-                    if agent.health <= 0:
-                        self.__players.remove(agent)
-                        reward += REWARD_KILL_TARGET
-                else:
-                    reward = REWARD_TOUCH_EMPTY
+        for target in self.other_players_state(new_state):
+            reward = agent.attack(target)
+            if target.health <= 0:
+                self.__players.remove(agent)
+                reward += REWARD_KILL_TARGET
+                target.is_alive = False
         return reward
 
     #list of player state
@@ -666,7 +504,7 @@ class GameEnvironment(Singleton):
             elif new_state in self.other_players_state(new_state):
                 reward = REWARD_OUT
             elif action == PUNCH and self.is_near_players(state):
-                reward = self.attack_near_players(new_state)
+                reward = self.attack_players(agent, new_state)
             elif action == BLOCK:
                 reward = REWARD_BLOCK
             else:
@@ -674,17 +512,50 @@ class GameEnvironment(Singleton):
             state = new_state
         else:
             reward = REWARD_OUT
-        agent.update(action, state, has_neighbours, reward)
+        agent.update_ia(action, state, has_neighbours, reward)
         return reward
 
-class Agent:
-    def __init__(self, environment, health, position):
+
+class Agent(arcade.Sprite):
+
+    def __init__(self, environment, health, position, sprites, face_direction):
+        super().__init__()
+
+        self.__character_face_direction = face_direction
         self.__state = position
         self.__score = 0
         self.__last_action = None
         self.__qtable = {}
         self.__health = health
         self.__actual_action = None
+
+        self.__sprites = sprites
+        self.__face_direction = face_direction
+
+        # Used for flipping between image sequences
+        self.__cur_texture = 0
+        self.__cur_attack_texture = 0
+        self.__cur_idle_texture = 0
+        self.__cur_dead_texture = 0
+        self.__scale = CHARACTER_SCALING
+
+        # Track our state
+        self.__is_on_ladder = False
+        self.__is_attacking = False
+        self.__is_touched = False
+        self.__is_blocking = False
+        self.__is_dead = False
+        self.__is_alive = True
+        self.__is_down = False
+
+        # Load textures for idle standing
+        self.idle_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Idle1.png")
+        self.jump_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Dead3.png")
+        self.fall_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Idle1.png")
+        self.block_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Dead1.png")
+
+        # Set up sprites animations for the agent
+        self.set_up_agent_sprites(sprites)
 
         # QTable initialization
         for s in environment.states:
@@ -693,6 +564,34 @@ class Agent:
                 self.__qtable[s][a] = {}
                 for k in range(2):
                     self.__qtable[s][a][k % 2 == 0] = 0.0
+
+    def set_up_agent_sprites(self, sprites):
+        # Load textures for walking
+        self.walk_textures = []
+        for i in range(1, 10):
+            walk_texture = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Walk{i}.png")
+            self.walk_textures.append(walk_texture)
+
+        # Load textures for attacking
+        self.attack_textures = []
+        for i in range(1, 8):
+            attack_texture = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Attack{i}.png")
+            self.attack_textures.append(attack_texture)
+
+        self.idle_textures = []
+        for i in range(1, 16):
+            idle_texture = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Idle{i}.png")
+            self.idle_textures.append(idle_texture)
+
+        self.dead_textures = []
+        for i in range(1, 13):
+            dead_texture = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Dead{i}.png")
+            self.dead_textures.append(dead_texture)
+
+        # Set the initial texture
+        if not self.__is_attacking:
+            self.texture = self.idle_texture_pair[0]
+
 
     def _get_health(self):
         return self.__health
@@ -711,6 +610,7 @@ class Agent:
 
     def is_alive(self):
         if self.__health <= 0:
+            self.__is_alive = False
             return False
         return True
 
@@ -723,7 +623,7 @@ class Agent:
     actual_action = property(_get_actual_action, _set_actual_action)
 
 
-    def update(self, action, new_state, has_neighbours, reward):
+    def update_ia(self, action, new_state, has_neighbours, reward):
         # QTable update
         # Q(s, a) <- Q(s, a) + learning_rate * [reward + discount_factor * max(qtable[a]) - Q(s, a)]
         maxQ = 0.0
@@ -752,6 +652,86 @@ class Agent:
                 best = a
                 self.__actual_action = best
 
+
+    def attack(self, new_state, target):
+        reward = 0
+        self.__is_attacking = True
+        arcade.play_sound(ATTACK_SOUND)
+        if self.get_distance_between_players(new_state, target.state) == 1:
+            if target.actual_action != BLOCK:
+                target.__is_touched = True
+                target.hp -= 1
+                arcade.play_sound(HIT_SOUND)
+                reward += REWARD_BEING_TOUCH
+            else:
+                target.__is_blocking = True
+                arcade.play_sound(BLOCK_SOUND)
+                reward = REWARD_TOUCH_EMPTY
+        return reward
+
+    def get_distance_between_players(self, state_agent1, state_agent2):
+        return abs(state_agent1[0] - state_agent2[0]) + abs(state_agent1[1] - state_agent2[1])
+
+    def update_animation(self, delta_time: float = 1 / 60):
+
+        # Figure out if we need to flip face left or right
+        if self.change_x < 0 and self.character_face_direction == RIGHT_FACING:
+            self.character_face_direction = LEFT_FACING
+        elif self.change_x > 0 and self.character_face_direction == LEFT_FACING:
+            self.character_face_direction = RIGHT_FACING
+
+        # Jumping animation
+        if self.change_y > 0 and not self.__is_on_ladder:
+            self.texture = self.jump_texture_pair[self.character_face_direction]
+            return
+        elif self.change_y < 0 and not self.__is_on_ladder:
+            self.texture = self.fall_texture_pair[self.character_face_direction]
+            return
+
+        # Block animation
+        if self.__is_blocking == True:
+            self.texture = self.block_texture_pair[self.character_face_direction]
+            return
+
+        # Attacking animation
+        if self.__is_attacking and self.change_x == 0:
+            self.cur_attack_texture = 0
+            self.cur_attack_texture += 1
+            if self.cur_attack_texture > 8:
+                self.cur_attack_texture = 0
+                self.attacking = False
+            self.texture = self.attack_textures[self.cur_attack_texture][
+                self.character_face_direction
+            ]
+            return
+        elif not self.is_alive and not self.__is_down and self.change_x == 0:
+            self.__cur_dead_texture += 1
+            if self.__cur_dead_texture > 10:
+                self.is_down = True
+            self.texture = self.dead_textures[self.__cur_dead_texture][
+                self.character_face_direction
+            ]
+            return
+        # Idle animation
+        elif self.change_x == 0 and self.is_alive:
+            self.__cur_idle_texture += 1
+            if self.__cur_idle_texture > 14:
+                self.cur_idle_texture = 0
+            self.texture = self.idle_textures[self.cur_idle_texture][
+                self.character_face_direction
+            ]
+            return
+
+
+        # Walking animation
+        if not self.__is_down:
+            self.__cur_texture += 1
+            if self.__cur_texture > 7:
+                self.cur_texture = 0
+            self.texture = self.walk_textures[self.cur_texture][
+                self.character_face_direction
+            ]
+
     @property
     def state(self):
         return self.__state
@@ -778,9 +758,16 @@ class AgentManager:
         self.__population = population
         self.__health = health
         self.__agents = []
+        self.set_new_agents()
+
+    def set_new_agents(self):
         for i in range(self.__population):
-            self.__agents.append(Agent(self.__environment, health, self.__environment.players_pos[i]))
-            self.__environment.players = self.__agents
+            if i % 2 == 0:
+                self.__agents.append(Agent(self.__environment, MAX_HP, self.__environment.players_pos[i], 'male', RIGHT_FACING))
+            else:
+                self.__agents.append(
+                    Agent(self.__environment, MAX_HP, self.__environment.players_pos[i], 'female', LEFT_FACING))
+        self.__environment.players = self.__agents
 
     # Verify if all agents are alive
     def is_only_one_agent_alive(self):
@@ -803,14 +790,7 @@ class AgentManager:
 
     def reset(self):
         # for each agent, reset the health and the state
-        for i in range(len(self.get_agents)):
-            self.__agents[i].health = self.get_agents_health
-        for j in range(i + 1, self.__population):
-            self.__agents.append(Agent(self.__environment, self.get_agents_health, self.__environment.players_pos[j]))
-            self.__environment.players = self.__agents
-        self.__environment.players = self.__agents
-        self.__score = 0
-        self.__last_action = None
+        self.set_new_agents()
 
     # get all alive agents
     @property
