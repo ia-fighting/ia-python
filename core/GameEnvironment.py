@@ -463,9 +463,8 @@ class GameEnvironment(Singleton):
 
     # Appliquer une action sur l'environnement
     # On met à jour l'état de l'agent, on lui donne sa récompense
-    def apply(self, agent):
+    def apply(self, agent, opponent):
         state = agent.state
-        has_neighbours = self.is_near_players(state)
         action = agent.actual_action
         new_state = self.moving_agent(state, action)
         # Calcul recompense agent et lui transmettre
@@ -483,7 +482,7 @@ class GameEnvironment(Singleton):
             state = new_state
         else:
             reward = REWARD_OUT
-        agent.update_ia(action, state, has_neighbours, reward)
+        agent.update_ia(action, state, opponent, reward)
         return reward
 
     @property
@@ -518,7 +517,7 @@ class GameEnvironment(Singleton):
 
 class Agent(arcade.Sprite):
 
-    def __init__(self, environment, health, position, sprites, face_direction):
+    def __init__(self, environment, health, position, sprites, face_direction, qtable):
         super().__init__()
 
         self.character_face_direction = face_direction
@@ -563,12 +562,17 @@ class Agent(arcade.Sprite):
         self.set_up_agent_sprites()
 
         # QTable initialization
-        for s in environment.states:
-            self.__qtable[s] = {}
-            for a in ACTIONS:
-                self.__qtable[s][a] = {}
-                for k in range(2):
-                    self.__qtable[s][a][k % 2 == 0] = 0.0
+        if qtable is None:
+            for s in environment.states:
+                self.__qtable[s] = {}
+                for a in ACTIONS:
+                    self.__qtable[s][a] = {}
+                    for s2 in environment.states:
+                        self.__qtable[s][a][s2] = {}
+                        for a2 in ACTIONS:
+                            self.__qtable[s][a][s2][a2] = 0.0
+        else:
+            self.__qtable = qtable
 
     def set_up_agent_sprites(self):
         # Load textures for walking
@@ -593,19 +597,22 @@ class Agent(arcade.Sprite):
         if not self.__is_attacking:
             self.texture = self.idle_texture_pair[0]
 
-    def update_ia(self, action, new_state, has_neighbours, reward):
+    def update_ia(self, action, new_state, opponent, reward):
         # QTable update
         # Q(s, a) <- Q(s, a) + learning_rate * [reward + discount_factor * max(qtable[a]) - Q(s, a)]
         maxQ = 0.0
         # max of qtable
         for a in ACTIONS:
-            if self.__qtable[new_state][a][has_neighbours] > maxQ:
-                maxQ = self.__qtable[new_state][a][has_neighbours]
-        LEARNING_RATE = 0.5
-        DISCOUNT_FACTOR = 0.5
+            if opponent.last_action is not None:
+                if self.__qtable[new_state][a][opponent.state][opponent.last_action] > maxQ:
+                    maxQ = self.__qtable[new_state][a][opponent.state][opponent.last_action]
+        LEARNING_RATE = 0.8
+        DISCOUNT_FACTOR = 0.8
 
-        self.__qtable[self.__state][action][has_neighbours] += \
-            LEARNING_RATE * (reward + DISCOUNT_FACTOR * maxQ - self.__qtable[self.__state][action][has_neighbours])
+        if opponent.last_action is not None:
+            self.__qtable[self.__state][action][opponent.state][opponent.last_action] += \
+                LEARNING_RATE * (reward + DISCOUNT_FACTOR * maxQ -
+                                 self.__qtable[self.__state][action][opponent.state][opponent.last_action])
 
         self.__state = new_state
         self.__score += reward
@@ -613,14 +620,19 @@ class Agent(arcade.Sprite):
         self.__actual_action = None
 
     # Best action who maximise reward
-    def best_action(self, environment):
+    def best_action(self, opponent):
         possible_rewards = self.__qtable[self.__state]
         best = None
         for a in possible_rewards:
-            has_neighbours = environment.is_near_players(self.__state)
-            if best is None or possible_rewards[a][has_neighbours] > possible_rewards[best][has_neighbours]:
-                best = a
-                self.__actual_action = best
+            if opponent.last_action is None:
+                if best is None or possible_rewards[a][opponent.state][a] > possible_rewards[best][opponent.state][a]:
+                    best = a
+            else:
+                if best is None or possible_rewards[a][opponent.state][opponent.last_action] > \
+                        possible_rewards[best][opponent.state][opponent.last_action]:
+                    best = a
+                    print(possible_rewards[best][opponent.state][opponent.last_action])
+        self.__actual_action = best
 
     def attack(self, new_state, target):
         reward = 0
@@ -776,15 +788,20 @@ class AgentManager:
         self.set_new_agents()
 
     def set_new_agents(self):
+        qtable1 = None
+        qtable2 = None
+        if len(self.__agents) > 1:
+            qtable1 = self.__agents[0].qtable
+            qtable2 = self.__agents[1].qtable
         self.__agents.clear()
         for i in range(self.__population):
             if i % 2 == 0:
                 self.__agents.append(Agent(self.__environment, MAX_HP,
-                                           self.__environment.players_pos[i], 'male', RIGHT_FACING))
+                                           self.__environment.players_pos[i], 'male', RIGHT_FACING, qtable1))
             else:
                 self.__agents.append(
                     Agent(self.__environment, MAX_HP,
-                          self.__environment.players_pos[i], 'female', LEFT_FACING))
+                          self.__environment.players_pos[i], 'female', LEFT_FACING, qtable2))
         self.__environment.players = self.__agents
 
     # Verify if all agents are alive
@@ -827,11 +844,16 @@ class AgentManager:
     def goal(self):
         return self.is_only_one_agent_alive()
 
+    def get_opponent(self, agent):
+        for a in self.__agents:
+            if a != agent:
+                return a
+
     # Best action for each agent
     def best_actions(self):
         for a in self.__agents:
             if a.is_alive:
-                a.best_action(self.__environment)
+                a.best_action(self.get_opponent(a))
 
     def apply_actions(self, agents):
         # Apply moving actions
@@ -840,14 +862,14 @@ class AgentManager:
             if agent.is_alive:
                 actual_action = agent.actual_action
                 if actual_action in MOVING_ACTIONS:
-                    self.__environment.apply(agents[i])
+                    self.__environment.apply(agents[i], self.get_opponent(agents[i]))
         # Apply others actions
         for i in range(len(agents)):
             agent = agents[i]
             if agents[i].is_alive:
                 actual_action = agent.actual_action
                 if actual_action not in MOVING_ACTIONS and actual_action is not None:
-                    self.__environment.apply(agent)
+                    self.__environment.apply(agent, self.get_opponent(agents[i]))
 
     def display(self, generation, iteration, width):
         os.system('cls')
