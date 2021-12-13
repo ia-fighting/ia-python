@@ -1,6 +1,7 @@
 # Game environment class
-
+import pickle
 import time
+import json
 
 from utils.Singleton import Singleton
 import os
@@ -318,7 +319,6 @@ class MyGame(arcade.Window):
             bold=True
         )
 
-
         # Hit_box
         # self.player_two_sprite.draw_hit_box(arcade.color.RED)
         # self.player_one_sprite.draw_hit_box(arcade.color.YELLOW)
@@ -365,8 +365,14 @@ class MyGame(arcade.Window):
             self.ia_am.reset()
             self.setup()
             self.__generation_counter += 1
+            if self.__generation_counter % 2 == 0:
+                self.save_qtables(self.ia_am.agents)
             self.__iteration_counter = 0
             time.sleep(0.2)
+
+    def save_qtables(self, agents):
+        for i in range(len(agents)):
+            agents[i].save_qtable(f"qtable_agent_{i}")
 
     def update_health_bar(self, player_sprite):
         if MAX_HP > player_sprite.health >= 0 and player_sprite.is_touched:
@@ -374,7 +380,6 @@ class MyGame(arcade.Window):
                 player_sprite.is_touched = False
                 player_sprite.health_bar.pop()
                 player_sprite.health_bar.draw()
-
 
     def update_action_animation(self, is_beginning, player_sprite):
         if is_beginning:
@@ -427,7 +432,7 @@ class GameEnvironment(Singleton):
                 if target.health <= 0:
                     reward += REWARD_KILL_TARGET
                     target.is_alive = False
-                    #self.players.remove(agent)
+                    # self.players.remove(agent)
         return reward
 
     def is_near_players(self, state):
@@ -456,7 +461,7 @@ class GameEnvironment(Singleton):
 
     def other_players_state(self, new_state):
         players_state = self.get_players_state.copy()
-        #remove state from get_players_state
+        # remove state from get_players_state
         if new_state in self.get_players_state:
             players_state.remove(new_state)
         return players_state
@@ -509,7 +514,7 @@ class GameEnvironment(Singleton):
     def all_states(self):
         return self.__states
 
-    #list of player state
+    # list of player state
     @property
     def get_players_state(self):
         return [player.state for player in self.players]
@@ -517,7 +522,7 @@ class GameEnvironment(Singleton):
 
 class Agent(arcade.Sprite):
 
-    def __init__(self, environment, health, position, sprites, face_direction, qtable):
+    def __init__(self, environment, health, position, sprites, face_direction, qtable, agent_number):
         super().__init__()
 
         self.character_face_direction = face_direction
@@ -528,6 +533,7 @@ class Agent(arcade.Sprite):
         self.__health = health
         self.__actual_action = None
         self.__health_bar = arcade.SpriteList(use_spatial_hash=True)
+        self.__agent_number = agent_number
 
         self.__sprites = sprites
 
@@ -536,6 +542,8 @@ class Agent(arcade.Sprite):
         self.__cur_attack_texture = 0
         self.__cur_idle_texture = 0
         self.__cur_dead_texture = 0
+        self.__change_x = 0
+        self.__change_y = 0
         self.scale = CHARACTER_SCALING
 
         # Track our state
@@ -563,14 +571,17 @@ class Agent(arcade.Sprite):
 
         # QTable initialization
         if qtable is None:
-            for s in environment.states:
-                self.__qtable[s] = {}
-                for a in ACTIONS:
-                    self.__qtable[s][a] = {}
-                    for s2 in environment.states:
-                        self.__qtable[s][a][s2] = {}
-                        for a2 in ACTIONS:
-                            self.__qtable[s][a][s2][a2] = 0.0
+            if os.path.isfile('qtable_agent_' + str(self.__agent_number) + '.json'):
+                self.load_qtable('qtable_agent_' + str(self.__agent_number))
+            else:
+                for s in environment.states:
+                    self.__qtable[s] = {}
+                    for a in ACTIONS:
+                        self.__qtable[s][a] = {}
+                        for s2 in environment.states:
+                            self.__qtable[s][a][s2] = {}
+                            for a2 in ACTIONS:
+                                self.__qtable[s][a][s2][a2] = 0.0
         else:
             self.__qtable = qtable
 
@@ -619,6 +630,14 @@ class Agent(arcade.Sprite):
         self.__last_action = self.actual_action
         self.__actual_action = None
 
+    def save_qtable(self, file_name):
+        with open(file_name + '.json', 'wb') as f:
+            pickle.dump(self.qtable, f)
+
+    def load_qtable(self, file_name):
+        with open(file_name + '.json', 'rb') as f:
+            self.qtable = pickle.load(f)
+
     # Best action who maximise reward
     def best_action(self, opponent):
         possible_rewards = self.__qtable[self.__state]
@@ -631,7 +650,6 @@ class Agent(arcade.Sprite):
                 if best is None or possible_rewards[a][opponent.state][opponent.last_action] > \
                         possible_rewards[best][opponent.state][opponent.last_action]:
                     best = a
-                    print(possible_rewards[best][opponent.state][opponent.last_action])
         self.__actual_action = best
 
     def attack(self, new_state, target):
@@ -640,9 +658,9 @@ class Agent(arcade.Sprite):
         arcade.play_sound(ATTACK_SOUND)
         if self.get_distance_between_players(new_state, target.state) == 1:
             if target.actual_action != BLOCK:
-                target.is_touched = True
+                target.__is_touched = True
                 target.__score -= REWARD_BEING_TOUCH
-                target.health -= 1
+                target.__health -= 1
                 arcade.play_sound(HIT_SOUND)
                 reward += REWARD_WOUND_TARGET
             else:
@@ -659,16 +677,16 @@ class Agent(arcade.Sprite):
     def update_animation(self, delta_time: float = 1 / 60):
 
         # Figure out if we need to flip face left or right
-        if self.change_x < 0 and self.character_face_direction == RIGHT_FACING:
+        if self.__change_x < 0 and self.character_face_direction == RIGHT_FACING:
             self.character_face_direction = LEFT_FACING
-        elif self.change_x > 0 and self.character_face_direction == LEFT_FACING:
+        elif self.__change_x > 0 and self.character_face_direction == LEFT_FACING:
             self.character_face_direction = RIGHT_FACING
 
         # Jumping animation
-        if self.change_y > 0 and not self.__is_on_ladder:
+        if self.__change_y > 0 and not self.__is_on_ladder:
             self.texture = self.jump_texture_pair[self.character_face_direction]
             return
-        elif self.change_y < 0 and not self.__is_on_ladder:
+        elif self.__change_y < 0 and not self.__is_on_ladder:
             self.texture = self.fall_texture_pair[self.character_face_direction]
             return
 
@@ -678,7 +696,7 @@ class Agent(arcade.Sprite):
             return
 
         # Attacking animation
-        if self.__is_attacking and self.change_x == 0:
+        if self.__is_attacking and self.__change_x == 0:
             self.__cur_attack_texture = 0
             self.__cur_attack_texture += 1
             if self.__cur_attack_texture > 8:
@@ -688,7 +706,7 @@ class Agent(arcade.Sprite):
                 self.character_face_direction
             ]
             return
-        elif not self.__is_alive and not self.__is_down and self.change_x == 0:
+        elif not self.__is_alive and not self.__is_down and self.__change_x == 0:
             self.__cur_dead_texture += 1
             if self.__cur_dead_texture > 10:
                 self.__is_down = True
@@ -697,7 +715,7 @@ class Agent(arcade.Sprite):
             ]
             return
         # Idle animation
-        elif self.change_x == 0 and self.__is_alive:
+        elif self.__change_x == 0 and self.__is_alive:
             self.__cur_idle_texture += 1
             if self.__cur_idle_texture > 14:
                 self.__cur_idle_texture = 0
@@ -719,9 +737,13 @@ class Agent(arcade.Sprite):
     def score(self):
         return self.__score
 
-    @property
-    def qtable(self):
+    def _get_qtable(self):
         return self.__qtable
+
+    def _set_qtable(self, qtable):
+        self.__qtable = qtable
+
+    qtable = property(_get_qtable, _set_qtable)
 
     def reset(self, environment):
         self.__state = environment.start
@@ -797,11 +819,11 @@ class AgentManager:
         for i in range(self.__population):
             if i % 2 == 0:
                 self.__agents.append(Agent(self.__environment, MAX_HP,
-                                           self.__environment.players_pos[i], 'male', RIGHT_FACING, qtable1))
+                                           self.__environment.players_pos[i], 'male', RIGHT_FACING, qtable1, i))
             else:
                 self.__agents.append(
                     Agent(self.__environment, MAX_HP,
-                          self.__environment.players_pos[i], 'female', LEFT_FACING, qtable2))
+                          self.__environment.players_pos[i], 'female', LEFT_FACING, qtable2, i))
         self.__environment.players = self.__agents
 
     # Verify if all agents are alive
