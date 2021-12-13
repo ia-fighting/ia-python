@@ -119,14 +119,14 @@ class MyGame(arcade.Window):
         self.player_one_sprite = None
         self.player_two_sprite = None
 
-        self.player_one_health_bar = None
-        self.player_two_health_bar = None
         self.game_over = None
         # Our physics engine
         self.physics_engine = None
         self.wall_list = None
         self.music_toggle_button = None
         self.ambiance_player = arcade.play_sound(AMBIANCE_SOUND, 0.8, 0.0, True)
+        self.__generation_counter = 0
+        self.__iteration_counter = 0
 
     def setup(self):
         """Set up the game here. Call this function to restart the game."""
@@ -150,8 +150,6 @@ class MyGame(arcade.Window):
         self.scene.add_sprite(LAYER_NAME_PLAYER_TWO, self.player_two_sprite)
 
         self.wall_list = arcade.SpriteList(use_spatial_hash=True)
-        self.player_one_health_bar = arcade.SpriteList(use_spatial_hash=True)
-        self.player_two_health_bar = arcade.SpriteList(use_spatial_hash=True)
 
         # This shows using a loop to place multiple sprites horizontally
         tile_source = f"{SPRITES_PATH}/tiles/tile2.png"
@@ -202,13 +200,13 @@ class MyGame(arcade.Window):
             coordinate_heart = [60 + i * 30, 600]
             heart = arcade.Sprite(f"{SPRITES_PATH}/objects/heart.png", 0.05)
             heart.position = coordinate_heart
-            self.player_one_health_bar.append(heart)
+            self.player_one_sprite.health_bar.append(heart)
 
         for i in range(1, self.player_two_sprite.health + 1):
             coordinate_heart = [940 - i * 30, 600]
             heart = arcade.Sprite(f"{SPRITES_PATH}/objects/heart.png", 0.05)
             heart.position = coordinate_heart
-            self.player_two_health_bar.append(heart)
+            self.player_two_sprite.health_bar.append(heart)
 
         self.music_toggle_button = arcade.gui.UITextureButton(
             x=930,
@@ -270,8 +268,8 @@ class MyGame(arcade.Window):
 
         # Draw all stripes
         self.wall_list.draw()
-        self.player_one_health_bar.draw()
-        self.player_two_health_bar.draw()
+        self.player_one_sprite.health_bar.draw()
+        self.player_two_sprite.health_bar.draw()
 
         # Draw our Scene
         self.scene.draw()
@@ -306,22 +304,16 @@ class MyGame(arcade.Window):
     def on_update(self, delta_time):
         """Movement and game logic"""
         # Remove heart
-        if MAX_HP > self.player_one_sprite.health >= 0 and self.player_one_sprite.is_touched:
-            self.player_one_sprite.is_touched = False
-            self.player_one_health_bar.pop()
-            self.player_one_health_bar.draw()
-
-        if MAX_HP > self.player_two_sprite.health >= 0 and self.player_two_sprite.is_touched:
-            self.player_two_sprite.is_touched = False
-            self.player_two_health_bar.pop()
-            self.player_two_health_bar.draw()
-
         self.player_one_sprite = self.ia_am.agents[0]
+        self.player_two_sprite = self.ia_am.agents[1]
+
+        self.update_health_bar(self.player_one_sprite)
+        self.update_health_bar(self.player_two_sprite)
+
         self.player_one_sprite.center_x = self.player_one_sprite.state[1] * PLAYER_START_X
         self.player_one_sprite.center_y = PLAYER_ONE_START_Y
 
         # Set up the player two, specifically placing it at these coordinates.
-        self.player_two_sprite = self.ia_am.agents[1]
         self.player_two_sprite.center_x = self.player_two_sprite.state[1] * PLAYER_START_X
         self.player_two_sprite.center_y = PLAYER_TWO_START_Y
 
@@ -341,7 +333,50 @@ class MyGame(arcade.Window):
         if not self.ia_am.goal:
             self.ia_am.best_actions()
             self.ia_am.apply_actions(self.ia_am.get_alive_agents)
-            time.sleep(0.1)
+            self.update_action_animation(True, self.player_one_sprite)
+            self.update_action_animation(True, self.player_two_sprite)
+            self.__iteration_counter += 1
+            time.sleep(0.2)
+            self.update_action_animation(False, self.player_one_sprite)
+            self.update_action_animation(False, self.player_two_sprite)
+        else:
+            self.ia_am.reset()
+            self.__generation_counter += 1
+            self.__iteration_counter = 0
+            time.sleep(0.2)
+
+    def update_health_bar(self, player_sprite):
+        if MAX_HP > player_sprite.health >= 0 and player_sprite.is_touched:
+            if len(player_sprite.health_bar) > 0:
+                player_sprite.is_touched = False
+                player_sprite.health_bar.pop()
+                player_sprite.health_bar.draw()
+
+
+    def update_action_animation(self, is_beginning, player_sprite):
+        if is_beginning:
+            """if key == arcade.key.Z and player_sprite.is_alive:
+                if player_sprite.can_jump():
+                    player_sprite.change_y = PLAYER_JUMP_SPEED
+                    arcade.play_sound(self.jump_sound)"""
+            if player_sprite.last_action == LEFT and self.player_one_sprite.is_alive:
+                player_sprite.__change_x = -PLAYER_MOVEMENT_SPEED
+            elif player_sprite.last_action == RIGHT and self.player_one_sprite.is_alive:
+                player_sprite.__change_x = PLAYER_MOVEMENT_SPEED
+            elif player_sprite.last_action == BLOCK and player_sprite.is_alive:
+                player_sprite.__is_blocking = True
+            """elif agent.last_action == PUNCH and player_sprite.is_alive:
+                player_sprite.attack(player_sprite, self.attack_sound, self.hit_sound, self.block_sound)"""
+        else:
+            if player_sprite.last_action == LEFT:
+                player_sprite.__change_x = 0
+            elif player_sprite.last_action == RIGHT:
+                player_sprite.__change_x = 0
+            elif player_sprite.last_action == PUNCH:
+                player_sprite.__change_x = 0
+                player_sprite.__is_attacking = False
+            elif player_sprite.last_action == BLOCK:
+                player_sprite.__is_blocking = False
 
 
 class GameEnvironment(Singleton):
@@ -461,16 +496,16 @@ class Agent(arcade.Sprite):
     def __init__(self, environment, health, position, sprites, face_direction):
         super().__init__()
 
-        self.__character_face_direction = face_direction
+        self.character_face_direction = face_direction
         self.__state = position
         self.__score = 0
         self.__last_action = None
         self.__qtable = {}
         self.__health = health
         self.__actual_action = None
+        self.__health_bar = arcade.SpriteList(use_spatial_hash=True)
 
         self.__sprites = sprites
-        self.__face_direction = face_direction
 
         # Used for flipping between image sequences
         self.__cur_texture = 0
@@ -587,22 +622,22 @@ class Agent(arcade.Sprite):
     def update_animation(self, delta_time: float = 1 / 60):
 
         # Figure out if we need to flip face left or right
-        if self.change_x < 0 and self.__face_direction == RIGHT_FACING:
-            self.__face_direction = LEFT_FACING
-        elif self.change_x > 0 and self.__face_direction == LEFT_FACING:
-            self.__face_direction = RIGHT_FACING
+        if self.change_x < 0 and self.character_face_direction == RIGHT_FACING:
+            self.character_face_direction = LEFT_FACING
+        elif self.change_x > 0 and self.character_face_direction == LEFT_FACING:
+            self.character_face_direction = RIGHT_FACING
 
         # Jumping animation
         if self.change_y > 0 and not self.__is_on_ladder:
-            self.texture = self.jump_texture_pair[self.__face_direction]
+            self.texture = self.jump_texture_pair[self.character_face_direction]
             return
         elif self.change_y < 0 and not self.__is_on_ladder:
-            self.texture = self.fall_texture_pair[self.__face_direction]
+            self.texture = self.fall_texture_pair[self.character_face_direction]
             return
 
         # Block animation
         if self.__is_blocking:
-            self.texture = self.block_texture_pair[self.__face_direction]
+            self.texture = self.block_texture_pair[self.character_face_direction]
             return
 
         # Attacking animation
@@ -613,7 +648,7 @@ class Agent(arcade.Sprite):
                 self.__cur_attack_texture = 0
                 self.__is_attacking = False
             self.texture = self.attack_textures[self.__cur_attack_texture][
-                self.__face_direction
+                self.character_face_direction
             ]
             return
         elif not self.__is_alive and not self.__is_down and self.change_x == 0:
@@ -621,7 +656,7 @@ class Agent(arcade.Sprite):
             if self.__cur_dead_texture > 10:
                 self.__is_down = True
             self.texture = self.dead_textures[self.__cur_dead_texture][
-                self.__face_direction
+                self.character_face_direction
             ]
             return
         # Idle animation
@@ -630,7 +665,7 @@ class Agent(arcade.Sprite):
             if self.__cur_idle_texture > 14:
                 self.__cur_idle_texture = 0
             self.texture = self.idle_textures[self.__cur_idle_texture][
-                self.__face_direction
+                self.character_face_direction
             ]
             return
 
@@ -640,7 +675,7 @@ class Agent(arcade.Sprite):
             if self.__cur_texture > 7:
                 self.__cur_texture = 0
             self.texture = self.walk_textures[self.__cur_texture][
-                self.__face_direction
+                self.character_face_direction
             ]
 
     @property
@@ -673,6 +708,14 @@ class Agent(arcade.Sprite):
         self.__is_alive = is_alive
 
     is_alive = property(_get_is_alive, _set_is_alive)
+
+    def _get_health_bar(self):
+        return self.__health_bar
+
+    def _set_health_bar(self, health_bar):
+        self.__health_bar = health_bar
+
+    health_bar = property(_get_health_bar, _set_health_bar)
 
     def _get_state(self):
         return self.__state
