@@ -243,8 +243,6 @@ class MyGame(arcade.Window):
             self.player_two_sprite, gravity_constant=GRAVITY, walls=self.scene["Walls"]
         )
 
-        self.ia_am.reset()
-
     def toggle_music(self, event):
         if self.active_ambiance:
             arcade.Sound.set_volume(self=self, volume=0, player=self.ambiance_player)
@@ -365,6 +363,7 @@ class MyGame(arcade.Window):
             self.update_action_animation(False, self.player_two_sprite)
         else:
             self.ia_am.reset()
+            self.setup()
             self.__generation_counter += 1
             self.__iteration_counter = 0
             time.sleep(0.2)
@@ -423,12 +422,12 @@ class GameEnvironment(Singleton):
     def attack_players(self, agent, new_state):
         reward = 0
         for target in self.players:
-            if target != agent:
+            if target.state != new_state:
                 reward = agent.attack(new_state, target)
                 if target.health <= 0:
-                    self.players.remove(agent)
                     reward += REWARD_KILL_TARGET
                     target.is_alive = False
+                    #self.players.remove(agent)
         return reward
 
     def is_near_players(self, state):
@@ -777,6 +776,7 @@ class AgentManager:
         self.set_new_agents()
 
     def set_new_agents(self):
+        self.__agents.clear()
         for i in range(self.__population):
             if i % 2 == 0:
                 self.__agents.append(Agent(self.__environment, MAX_HP,
