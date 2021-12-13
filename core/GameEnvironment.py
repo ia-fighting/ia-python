@@ -1,7 +1,5 @@
 # Game environment class
 import pickle
-import time
-import json
 
 from utils.Singleton import Singleton
 import os
@@ -17,6 +15,7 @@ WALL = '#'
 REWARD_OUT = -25
 REWARD_EMPTY = -1
 REWARD_BLOCK = -5
+REWARD_BLOCK_ATTACK = 25
 REWARD_WOUND_TARGET = 30
 REWARD_KILL_TARGET = 100
 REWARD_BEING_TOUCH = -20
@@ -223,15 +222,6 @@ class MyGame(arcade.Window):
             texture=arcade.load_texture(f"{SPRITES_PATH}/objects/game_over.png", 0.5),
         )
 
-        # self.game_over = arcade.gui.UITextArea(
-        #     x=400,
-        #     y=500,
-        #     text="Game Over",
-        #     font_name="Blackadder ITC",
-        #     font_size=30,
-        #     text_color=arcade.color.RED
-        # )
-
         self.music_toggle_button.on_click = self.toggle_music
         self.ui_manager.add(self.music_toggle_button)
 
@@ -243,6 +233,17 @@ class MyGame(arcade.Window):
         self.player_two_physics_engine = arcade.PhysicsEnginePlatformer(
             self.player_two_sprite, gravity_constant=GRAVITY, walls=self.scene["Walls"]
         )
+
+    def on_key_press(self, key, modifiers):
+        """Called whenever a key is pressed."""
+        # Gui
+        if key == arcade.key.M:
+            self.toggle_music(event=None)
+
+        # Player One Actions
+        if key == arcade.key.R:
+            self.ia_am.reset()
+            self.setup()
 
     def toggle_music(self, event):
         if self.active_ambiance:
@@ -358,7 +359,6 @@ class MyGame(arcade.Window):
             self.update_action_animation(True, self.player_one_sprite)
             self.update_action_animation(True, self.player_two_sprite)
             self.__iteration_counter += 1
-            time.sleep(0.2)
             self.update_action_animation(False, self.player_one_sprite)
             self.update_action_animation(False, self.player_two_sprite)
         else:
@@ -368,7 +368,10 @@ class MyGame(arcade.Window):
             if self.__generation_counter % 2 == 0:
                 self.save_qtables(self.ia_am.agents)
             self.__iteration_counter = 0
-            time.sleep(0.2)
+
+        self.scene.update_animation(
+            delta_time, [LAYER_NAME_PLAYER_ONE, LAYER_NAME_PLAYER_TWO]
+        )
 
     def save_qtables(self, agents):
         for i in range(len(agents)):
@@ -389,8 +392,10 @@ class MyGame(arcade.Window):
                     arcade.play_sound(self.jump_sound)"""
             if player_sprite.last_action == LEFT and self.player_one_sprite.is_alive:
                 player_sprite.__change_x = -PLAYER_MOVEMENT_SPEED
+                player_sprite.__is_walking = True
                 player_sprite.character_face_direction = LEFT_FACING
             elif player_sprite.last_action == RIGHT and self.player_one_sprite.is_alive:
+                player_sprite.__is_walking = True
                 player_sprite.__change_x = PLAYER_MOVEMENT_SPEED
                 player_sprite.character_face_direction = RIGHT_FACING
             elif player_sprite.last_action == BLOCK and player_sprite.is_alive:
@@ -400,8 +405,10 @@ class MyGame(arcade.Window):
         else:
             if player_sprite.last_action == LEFT:
                 player_sprite.__change_x = 0
+                player_sprite.__is_walking = False
             elif player_sprite.last_action == RIGHT:
                 player_sprite.__change_x = 0
+                player_sprite.__is_walking = False
             elif player_sprite.last_action == PUNCH:
                 player_sprite.__change_x = 0
                 player_sprite.__is_attacking = False
@@ -432,7 +439,6 @@ class GameEnvironment(Singleton):
                 if target.health <= 0:
                     reward += REWARD_KILL_TARGET
                     target.is_alive = False
-                    # self.players.remove(agent)
         return reward
 
     def is_near_players(self, state):
@@ -469,6 +475,7 @@ class GameEnvironment(Singleton):
     # Appliquer une action sur l'environnement
     # On met à jour l'état de l'agent, on lui donne sa récompense
     def apply(self, agent, opponent):
+        reward = 0
         state = agent.state
         action = agent.actual_action
         new_state = self.moving_agent(state, action)
@@ -481,7 +488,13 @@ class GameEnvironment(Singleton):
             elif action == PUNCH and self.is_near_players(state):
                 reward = self.attack_players(agent, new_state)
             elif action == BLOCK:
-                reward = REWARD_BLOCK
+                if opponent.actual_action is None:
+                    if opponent.actual_action == PUNCH:
+                        reward = REWARD_BLOCK_ATTACK
+                elif opponent.last_action == PUNCH:
+                    reward = REWARD_BLOCK_ATTACK
+                else:
+                    reward = REWARD_BLOCK
             else:
                 reward = REWARD_EMPTY
             state = new_state
@@ -571,7 +584,7 @@ class Agent(arcade.Sprite):
 
         # QTable initialization
         if qtable is None:
-            if os.path.isfile('qtable_agent_' + str(self.__agent_number) + '.json'):
+            if os.path.isfile('qtable_agent_' + str(self.__agent_number) + '.dat'):
                 self.load_qtable('qtable_agent_' + str(self.__agent_number))
             else:
                 for s in environment.states:
@@ -631,11 +644,11 @@ class Agent(arcade.Sprite):
         self.__actual_action = None
 
     def save_qtable(self, file_name):
-        with open(file_name + '.json', 'wb') as f:
+        with open(file_name + '.dat', 'wb') as f:
             pickle.dump(self.qtable, f)
 
     def load_qtable(self, file_name):
-        with open(file_name + '.json', 'rb') as f:
+        with open(file_name + '.dat', 'rb') as f:
             self.qtable = pickle.load(f)
 
     # Best action who maximise reward
