@@ -297,6 +297,18 @@ class MyGame(arcade.Window):
             14,
             bold=True
         )
+
+        # Draw game iterations
+        game_iterations = f"Iteration: {self.__iteration_counter}"
+        arcade.draw_text(
+            game_iterations,
+            30,
+            30,
+            arcade.csscolor.WHITE,
+            14,
+            bold=True
+        )
+
         # Hit_box
         # self.player_two_sprite.draw_hit_box(arcade.color.RED)
         # self.player_one_sprite.draw_hit_box(arcade.color.YELLOW)
