@@ -361,8 +361,10 @@ class MyGame(arcade.Window):
                     arcade.play_sound(self.jump_sound)"""
             if player_sprite.last_action == LEFT and self.player_one_sprite.is_alive:
                 player_sprite.__change_x = -PLAYER_MOVEMENT_SPEED
+                player_sprite.character_face_direction = LEFT_FACING
             elif player_sprite.last_action == RIGHT and self.player_one_sprite.is_alive:
                 player_sprite.__change_x = PLAYER_MOVEMENT_SPEED
+                player_sprite.character_face_direction = RIGHT_FACING
             elif player_sprite.last_action == BLOCK and player_sprite.is_alive:
                 player_sprite.__is_blocking = True
             """elif agent.last_action == PUNCH and player_sprite.is_alive:
