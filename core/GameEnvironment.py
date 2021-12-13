@@ -1,5 +1,6 @@
 # Game environment class
 import pickle
+from random import random, choice
 
 from utils.Singleton import Singleton
 import os
@@ -561,6 +562,7 @@ class Agent(arcade.Sprite):
         self.__cur_dead_texture = 0
         self.__change_x = 0
         self.__change_y = 0
+        self.__exploration = 1.0
         self.scale = CHARACTER_SCALING
 
         # Track our state
@@ -659,6 +661,9 @@ class Agent(arcade.Sprite):
     def best_action(self, opponent):
         possible_rewards = self.__qtable[self.__state]
         best = None
+        if random() < self.__exploration:
+            best = choice(list(possible_rewards.keys()))
+            self.__exploration *= 0.99
         for a in possible_rewards:
             if opponent.last_action is None:
                 if best is None or possible_rewards[a][opponent.state][a] > possible_rewards[best][opponent.state][a]:
