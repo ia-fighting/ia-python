@@ -1,5 +1,6 @@
 # Game environment class
 import pickle
+from random import random, choice
 
 from utils.Singleton import Singleton
 import os
@@ -18,9 +19,10 @@ REWARD_BLOCK = -5
 REWARD_BLOCK_ATTACK = 25
 REWARD_WOUND_TARGET = 30
 REWARD_KILL_TARGET = 100
+REWARD_DEATH = -100
 REWARD_BEING_TOUCH = -20
 REWARD_TOUCH_BLOCKING_TARGET = -2
-REWARD_TOUCH_EMPTY = -2
+REWARD_TOUCH_EMPTY = -4
 
 # Possible actions
 RIGHT = 'R'
@@ -259,13 +261,10 @@ class MyGame(arcade.Window):
 
     def on_draw(self):
         """Render the screen."""
-
         # Clear the screen to the background color
         arcade.start_render()
-
         # Draw the background texture
         arcade.draw_lrwh_rectangle_textured(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, self.background)
-
         # Draw all stripes
         self.wall_list.draw()
         self.player_one_sprite.health_bar.draw()
@@ -276,6 +275,9 @@ class MyGame(arcade.Window):
         self.bone.draw()
         self.ui_manager.draw()
 
+        self.draw_text()
+
+    def draw_text(self):
         # Draw player scores
         player_one_score = f"Score: {self.player_one_sprite.score}"
         arcade.draw_text(
@@ -320,10 +322,6 @@ class MyGame(arcade.Window):
             bold=True
         )
 
-        # Hit_box
-        # self.player_two_sprite.draw_hit_box(arcade.color.RED)
-        # self.player_one_sprite.draw_hit_box(arcade.color.YELLOW)
-
     def on_update(self, delta_time):
         """Movement and game logic"""
         # Remove heart
@@ -339,10 +337,6 @@ class MyGame(arcade.Window):
         # Set up the player two, specifically placing it at these coordinates.
         self.player_two_sprite.center_x = self.player_two_sprite.state[1] * PLAYER_START_X
         self.player_two_sprite.center_y = PLAYER_TWO_START_Y
-
-        # if not self.player_one_sprite.is_alive or not self.player_two_sprite.hp:
-        #     self.ui_manager.add(self.game_over)
-        #     self.ui_manager.draw()
 
         # Move the player with the physics engine
         self.player_one_physics_engine.update()
@@ -478,30 +472,41 @@ class GameEnvironment(Singleton):
         reward = 0
         state = agent.state
         action = agent.actual_action
-        new_state = self.moving_agent(state, action)
-        # Calcul recompense agent et lui transmettre
-        if new_state in self.__states:
-            if self.__states[new_state] in [WALL] or new_state[1] > len(ARENA) or new_state[1] < 0:
-                reward = REWARD_OUT
-            elif new_state in self.other_players_state(new_state):
-                reward = REWARD_OUT
-            elif action == PUNCH and self.is_near_players(state):
-                reward = self.attack_players(agent, new_state)
-            elif action == BLOCK:
-                if opponent.actual_action is None:
-                    if opponent.actual_action == PUNCH:
-                        reward = REWARD_BLOCK_ATTACK
-                elif opponent.last_action == PUNCH:
-                    reward = REWARD_BLOCK_ATTACK
-                else:
-                    reward = REWARD_BLOCK
-            else:
-                reward = REWARD_EMPTY
-            state = new_state
+        if not agent.is_alive:
+            reward = REWARD_DEATH
         else:
-            reward = REWARD_OUT
+            new_state = self.moving_agent(state, action)
+            # Calcul recompense agent et lui transmettre
+            if new_state in self.__states:
+                if self.__states[new_state] in [WALL] or new_state[1] > len(ARENA) or new_state[1] < 0:
+                    reward = REWARD_OUT
+                elif new_state in self.other_players_state(new_state):
+                    reward = REWARD_OUT
+                elif action == PUNCH and self.is_near_players(state):
+                    reward = self.attack_players(agent, new_state)
+                elif action == PUNCH:
+                    reward = REWARD_TOUCH_EMPTY
+                elif action == BLOCK:
+                    reward = self.do_action_bloc(agent, opponent)
+                else:
+                    reward = REWARD_EMPTY
+                state = new_state
+            else:
+                reward = REWARD_OUT
+        print(f"action: {action}, reward: {reward}, is alive: {agent.is_alive}")
         agent.update_ia(action, state, opponent, reward)
         return reward
+
+    def do_action_bloc(self, agent, opponent):
+        if opponent.actual_action is not None:
+            if opponent.actual_action == PUNCH and self.is_near_players(opponent.state):
+                return REWARD_BLOCK_ATTACK
+            else:
+                return REWARD_BLOCK
+        elif opponent.last_action == PUNCH and self.is_near_players(opponent.state):
+            return REWARD_BLOCK_ATTACK
+        else:
+            return REWARD_BLOCK
 
     @property
     def players_pos(self):
@@ -557,6 +562,7 @@ class Agent(arcade.Sprite):
         self.__cur_dead_texture = 0
         self.__change_x = 0
         self.__change_y = 0
+        self.__exploration = 1.0
         self.scale = CHARACTER_SCALING
 
         # Track our state
@@ -655,6 +661,9 @@ class Agent(arcade.Sprite):
     def best_action(self, opponent):
         possible_rewards = self.__qtable[self.__state]
         best = None
+        if random() < self.__exploration:
+            best = choice(list(possible_rewards.keys()))
+            self.__exploration *= 0.99
         for a in possible_rewards:
             if opponent.last_action is None:
                 if best is None or possible_rewards[a][opponent.state][a] > possible_rewards[best][opponent.state][a]:
@@ -672,7 +681,6 @@ class Agent(arcade.Sprite):
         if self.get_distance_between_players(new_state, target.state) == 1:
             if target.actual_action != BLOCK:
                 target.__is_touched = True
-                target.__score -= REWARD_BEING_TOUCH
                 target.__health -= 1
                 arcade.play_sound(HIT_SOUND)
                 reward += REWARD_WOUND_TARGET
@@ -894,17 +902,17 @@ class AgentManager:
         # Apply moving actions
         for i in range(len(agents)):
             agent = agents[i]
-            if agent.is_alive:
-                actual_action = agent.actual_action
-                if actual_action in MOVING_ACTIONS:
-                    self.__environment.apply(agents[i], self.get_opponent(agents[i]))
+            actual_action = agent.actual_action
+            if actual_action in MOVING_ACTIONS:
+                self.__environment.apply(agents[i], self.get_opponent(agents[i]))
         # Apply others actions
         for i in range(len(agents)):
             agent = agents[i]
-            if agents[i].is_alive:
-                actual_action = agent.actual_action
-                if actual_action not in MOVING_ACTIONS and actual_action is not None:
-                    self.__environment.apply(agent, self.get_opponent(agents[i]))
+            actual_action = agent.actual_action
+            if actual_action not in MOVING_ACTIONS and actual_action is not None:
+                self.__environment.apply(agent, self.get_opponent(agents[i]))
+
+
 
     def display(self, generation, iteration, width):
         os.system('cls')
