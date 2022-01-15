@@ -1,11 +1,13 @@
 # Game environment class
+import os
 import pickle
 from random import random, choice
 
-from utils.Singleton import Singleton
-import os
 import arcade
+import matplotlib.pyplot as plt
 from arcade.gui import UIManager
+
+from utils.Singleton import Singleton
 
 ARENA = """#  *      *     #"""
 
@@ -24,13 +26,17 @@ REWARD_BEING_TOUCH = -20
 REWARD_TOUCH_BLOCKING_TARGET = -2
 REWARD_TOUCH_EMPTY = -4
 
-# Possible actions
+# Possibles actions
 RIGHT = 'R'
 LEFT = 'L'
 PUNCH = 'P'
 BLOCK = 'B'
 ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
 MOVING_ACTIONS = [RIGHT, LEFT]
+
+# Q_Table evolution of agents in hashmap
+SCORE_TABLES_EVOLUTIONS = {}
+PLT_GENERATION_NUMBER = []
 
 PLAYER_1 = '1'
 PLAYER_2 = '2'
@@ -92,6 +98,38 @@ def load_texture_pair(filename):
     ]
 
 
+def display_plot():
+    """
+    Display a plot of data
+    """
+    # print(SCORE_TABLES_EVOLUTIONS)
+
+    X = PLT_GENERATION_NUMBER
+
+    # Assign variables to the y axis part of the curve
+    y = SCORE_TABLES_EVOLUTIONS[0]
+    z = SCORE_TABLES_EVOLUTIONS[1]
+
+    # print(y)
+    # print(z)
+    # print(X)
+
+    # Plotting both the curves simultaneously
+    plt.plot(X, y, color='r', label='Agent 1')
+    plt.plot(X, z, color='g', label='Agent 2')
+
+    # Naming the x-axis, y-axis and the whole graph
+    plt.xlabel("Generations")
+    plt.ylabel("Scores")
+    plt.title("Evolution of the scores by agents")
+
+    # Adding legend, which helps us recognize the curve according to it's color
+    plt.legend()
+
+    # To load the display window
+    plt.show()
+
+
 class MyGame(arcade.Window):
     """
     Main application class.
@@ -106,6 +144,8 @@ class MyGame(arcade.Window):
         self.ia_env = GameEnvironment(ARENA)
         # initialize AgentManager
         self.ia_am = AgentManager(self.ia_env, 2, MAX_HP)
+        SCORE_TABLES_EVOLUTIONS[0] = []
+        SCORE_TABLES_EVOLUTIONS[1] = []
         self.scene = None
 
         # Initialize  Ui Manager
@@ -356,6 +396,10 @@ class MyGame(arcade.Window):
             self.update_action_animation(False, self.player_one_sprite)
             self.update_action_animation(False, self.player_two_sprite)
         else:
+            PLT_GENERATION_NUMBER.append(self.__generation_counter)
+            for i in range(len(self.ia_am.agents)):
+                #print(f"Generation {PLT_GENERATION_NUMBER} - Agent {i} score: {self.ia_am.agents[i].score}")
+                SCORE_TABLES_EVOLUTIONS[i].append(self.ia_am.agents[i].score)
             self.ia_am.reset()
             self.setup()
             self.__generation_counter += 1
@@ -493,7 +537,7 @@ class GameEnvironment(Singleton):
                 state = new_state
             else:
                 reward = REWARD_OUT
-        print(f"action: {action}, reward: {reward}, is alive: {agent.is_alive}")
+        # print(f"action: {action}, reward: {reward}, is alive: {agent.is_alive}")
         agent.update_ia(action, state, opponent, reward)
         return reward
 
@@ -912,8 +956,6 @@ class AgentManager:
             if actual_action not in MOVING_ACTIONS and actual_action is not None:
                 self.__environment.apply(agent, self.get_opponent(agents[i]))
 
-
-
     def display(self, generation, iteration, width):
         os.system('cls')
         incr = 0
@@ -945,3 +987,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    display_plot()
