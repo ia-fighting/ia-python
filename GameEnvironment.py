@@ -67,6 +67,7 @@ PLAYER_TWO_START_Y = SPRITE_PIXEL_SIZE * TILE_SCALING * 3
 
 MAX_HP = 10
 
+
 # Constants used to track if the player is facing left or right
 RIGHT_FACING = 0
 LEFT_FACING = 1
@@ -75,11 +76,11 @@ LAYER_NAME_LADDERS = "Ladders"
 LAYER_NAME_PLAYER_ONE = "PlayerOne"
 LAYER_NAME_PLAYER_TWO = "PlayerTwo"
 
-SPRITES_PATH = "core/asset/sprites/png/"
-MAIN_PATH = f"core/asset/sprites/png/"
+SPRITES_PATH = "./asset/sprites/png/"
+MAIN_PATH = f"./asset/sprites/png/"
 
 # Load sounds
-SOUNDS_PATH = "core/asset/sounds/"
+SOUNDS_PATH = "./asset/sounds"
 
 AMBIANCE_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/ambiance.mp3")
 ATTACK_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/attack_short.mp3")
@@ -404,16 +405,15 @@ class MyGame(arcade.Window):
             self.setup()
             self.__generation_counter += 1
             if self.__generation_counter % 2 == 0:
-                self.save_qtables(self.ia_am.agents)
+                self.save_qtables()
             self.__iteration_counter = 0
 
         self.scene.update_animation(
             delta_time, [LAYER_NAME_PLAYER_ONE, LAYER_NAME_PLAYER_TWO]
         )
 
-    def save_qtables(self, agents):
-        for i in range(len(agents)):
-            agents[i].save_qtable(f"qtable_agent_{i}")
+    def save_qtables(self):
+        self.ia_am.save_qtable(f"qtable_agent_v2")
 
     def update_health_bar(self, player_sprite):
         if MAX_HP > player_sprite.health >= 0 and player_sprite.is_touched:
@@ -512,7 +512,7 @@ class GameEnvironment(Singleton):
 
     # Appliquer une action sur l'environnement
     # On met à jour l'état de l'agent, on lui donne sa récompense
-    def apply(self, agent, opponent):
+    def apply(self, agent, opponent, qtable):
         reward = 0
         state = agent.state
         action = agent.actual_action
@@ -538,7 +538,7 @@ class GameEnvironment(Singleton):
             else:
                 reward = REWARD_OUT
         # print(f"action: {action}, reward: {reward}, is alive: {agent.is_alive}")
-        agent.update_ia(action, state, opponent, reward)
+        agent.update_ia(action, qtable, state, opponent, reward)
         return reward
 
     def do_action_bloc(self, agent, opponent):
@@ -584,14 +584,13 @@ class GameEnvironment(Singleton):
 
 class Agent(arcade.Sprite):
 
-    def __init__(self, environment, health, position, sprites, face_direction, qtable, agent_number):
+    def __init__(self, health, position, sprites, face_direction, agent_number):
         super().__init__()
 
         self.character_face_direction = face_direction
         self.__state = position
         self.__score = 0
         self.__last_action = None
-        self.__qtable = {}
         self.__health = health
         self.__actual_action = None
         self.__health_bar = arcade.SpriteList(use_spatial_hash=True)
@@ -632,21 +631,6 @@ class Agent(arcade.Sprite):
         # Set up sprites animations for the agent
         self.set_up_agent_sprites()
 
-        # QTable initialization
-        if qtable is None:
-            if os.path.isfile('qtable_agent_' + str(self.__agent_number) + '.dat'):
-                self.load_qtable('qtable_agent_' + str(self.__agent_number))
-            else:
-                for s in environment.states:
-                    self.__qtable[s] = {}
-                    for a in ACTIONS:
-                        self.__qtable[s][a] = {}
-                        for s2 in environment.states:
-                            self.__qtable[s][a][s2] = {}
-                            for a2 in ACTIONS:
-                                self.__qtable[s][a][s2][a2] = 0.0
-        else:
-            self.__qtable = qtable
 
     def set_up_agent_sprites(self):
         # Load textures for walking
@@ -671,39 +655,31 @@ class Agent(arcade.Sprite):
         if not self.__is_attacking:
             self.texture = self.idle_texture_pair[0]
 
-    def update_ia(self, action, new_state, opponent, reward):
+    def update_ia(self, action, qtable, new_state, opponent, reward):
         # QTable update
         # Q(s, a) <- Q(s, a) + learning_rate * [reward + discount_factor * max(qtable[a]) - Q(s, a)]
         maxQ = 0.0
         # max of qtable
         for a in ACTIONS:
             if opponent.last_action is not None:
-                if self.__qtable[new_state][a][opponent.state][opponent.last_action] > maxQ:
-                    maxQ = self.__qtable[new_state][a][opponent.state][opponent.last_action]
+                if qtable[new_state][a][opponent.state][opponent.last_action] > maxQ:
+                    maxQ = qtable[new_state][a][opponent.state][opponent.last_action]
         LEARNING_RATE = 0.8
         DISCOUNT_FACTOR = 0.8
 
         if opponent.last_action is not None:
-            self.__qtable[self.__state][action][opponent.state][opponent.last_action] += \
+            qtable[self.__state][action][opponent.state][opponent.last_action] += \
                 LEARNING_RATE * (reward + DISCOUNT_FACTOR * maxQ -
-                                 self.__qtable[self.__state][action][opponent.state][opponent.last_action])
+                                 qtable[self.__state][action][opponent.state][opponent.last_action])
 
         self.__state = new_state
         self.__score += reward
         self.__last_action = self.actual_action
         self.__actual_action = None
 
-    def save_qtable(self, file_name):
-        with open(file_name + '.dat', 'wb') as f:
-            pickle.dump(self.qtable, f)
-
-    def load_qtable(self, file_name):
-        with open(file_name + '.dat', 'rb') as f:
-            self.qtable = pickle.load(f)
-
     # Best action who maximise reward
-    def best_action(self, opponent):
-        possible_rewards = self.__qtable[self.__state]
+    def best_action(self, opponent, qtable):
+        possible_rewards = qtable[self.__state]
         best = None
         if random() < self.__exploration:
             best = choice(list(possible_rewards.keys()))
@@ -802,14 +778,6 @@ class Agent(arcade.Sprite):
     def score(self):
         return self.__score
 
-    def _get_qtable(self):
-        return self.__qtable
-
-    def _set_qtable(self, qtable):
-        self.__qtable = qtable
-
-    qtable = property(_get_qtable, _set_qtable)
-
     def reset(self, environment):
         self.__state = environment.start
 
@@ -873,22 +841,32 @@ class AgentManager:
         self.__health = health
         self.__agents = []
         self.set_new_agents()
+        self.__qtable = {}
+
+        # QTable initialization
+        if self.qtable is None or len(self.qtable) == 0:
+            if os.path.isfile('qtable_agent_v2.dat'):
+                self.load_qtable('qtable_agent_v2')
+            else:
+                for s in environment.states:
+                    self.__qtable[s] = {}
+                    for a in ACTIONS:
+                        self.__qtable[s][a] = {}
+                        for s2 in environment.states:
+                            self.__qtable[s][a][s2] = {}
+                            for a2 in ACTIONS:
+                                self.__qtable[s][a][s2][a2] = 0.0
 
     def set_new_agents(self):
-        qtable1 = None
-        qtable2 = None
-        if len(self.__agents) > 1:
-            qtable1 = self.__agents[0].qtable
-            qtable2 = self.__agents[1].qtable
         self.__agents.clear()
         for i in range(self.__population):
             if i % 2 == 0:
-                self.__agents.append(Agent(self.__environment, MAX_HP,
-                                           self.__environment.players_pos[i], 'male', RIGHT_FACING, qtable1, i))
+                self.__agents.append(Agent(MAX_HP,
+                                           self.__environment.players_pos[i], 'male', RIGHT_FACING, i))
             else:
                 self.__agents.append(
-                    Agent(self.__environment, MAX_HP,
-                          self.__environment.players_pos[i], 'female', LEFT_FACING, qtable2, i))
+                    Agent(MAX_HP,
+                          self.__environment.players_pos[i], 'female', LEFT_FACING, i))
         self.__environment.players = self.__agents
 
     # Verify if all agents are alive
@@ -909,6 +887,22 @@ class AgentManager:
         self.__agents = agents
 
     agents = property(_get_agents, _set_agents)
+
+    def _get_qtable(self):
+        return self.__qtable
+
+    def _set_qtable(self, qtable):
+        self.__qtable = qtable
+
+    qtable = property(_get_qtable, _set_qtable)
+
+    def save_qtable(self, file_name):
+        with open(file_name + '.dat', 'wb') as f:
+            pickle.dump(self.qtable, f)
+
+    def load_qtable(self, file_name):
+        with open(file_name + '.dat', 'rb') as f:
+            self.qtable = pickle.load(f)
 
     @property
     def get_agents_health(self):
@@ -940,7 +934,7 @@ class AgentManager:
     def best_actions(self):
         for a in self.__agents:
             if a.is_alive:
-                a.best_action(self.get_opponent(a))
+                a.best_action(self.get_opponent(a), self.qtable)
 
     def apply_actions(self, agents):
         # Apply moving actions
@@ -948,13 +942,13 @@ class AgentManager:
             agent = agents[i]
             actual_action = agent.actual_action
             if actual_action in MOVING_ACTIONS:
-                self.__environment.apply(agents[i], self.get_opponent(agents[i]))
+                self.__environment.apply(agents[i], self.get_opponent(agents[i]), self.qtable)
         # Apply others actions
         for i in range(len(agents)):
             agent = agents[i]
             actual_action = agent.actual_action
             if actual_action not in MOVING_ACTIONS and actual_action is not None:
-                self.__environment.apply(agent, self.get_opponent(agents[i]))
+                self.__environment.apply(agent, self.get_opponent(agents[i]), self.qtable)
 
     def display(self, generation, iteration, width):
         os.system('cls')
