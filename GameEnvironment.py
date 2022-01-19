@@ -75,11 +75,11 @@ LAYER_NAME_LADDERS = "Ladders"
 LAYER_NAME_PLAYER_ONE = "PlayerOne"
 LAYER_NAME_PLAYER_TWO = "PlayerTwo"
 
-SPRITES_PATH = "core/asset/sprites/png/"
-MAIN_PATH = f"core/asset/sprites/png/"
+SPRITES_PATH = "../core/asset/sprites/png/"
+MAIN_PATH = f"../core/asset/sprites/png/"
 
 # Load sounds
-SOUNDS_PATH = "core/asset/sounds/"
+SOUNDS_PATH = "../core/asset/sounds/"
 
 AMBIANCE_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/ambiance.mp3")
 ATTACK_SOUND = arcade.load_sound(f"{SOUNDS_PATH}/attack_short.mp3")
@@ -287,6 +287,9 @@ class MyGame(arcade.Window):
             self.ia_am.reset()
             self.setup()
 
+        if key == arcade.key.I:
+            self.load_inverse_qtable(self.ia_am.agents)
+
     def toggle_music(self, event):
         if self.active_ambiance:
             arcade.Sound.set_volume(self=self, volume=0, player=self.ambiance_player)
@@ -413,7 +416,11 @@ class MyGame(arcade.Window):
 
     def save_qtables(self, agents):
         for i in range(len(agents)):
-            agents[i].save_qtable(f"qtable_agent_{i}")
+            agents[i].save_qtable(f"../qtable_agent_{i}")
+
+    def load_inverse_qtable(self, agents):
+        for i in range(len(agents)):
+            agents[i].load_qtable('../qtable_agent_' + str((agents[i].agent_number + 1) % 2))
 
     def update_health_bar(self, player_sprite):
         if MAX_HP > player_sprite.health >= 0 and player_sprite.is_touched:
@@ -634,8 +641,8 @@ class Agent(arcade.Sprite):
 
         # QTable initialization
         if qtable is None:
-            if os.path.isfile('qtable_agent_' + str(self.__agent_number) + '.dat'):
-                self.load_qtable('qtable_agent_' + str(self.__agent_number))
+            if os.path.isfile('../qtable_agent_' + str(self.agent_number) + '.dat'):
+                self.load_qtable('../qtable_agent_' + str(self.agent_number))
             else:
                 for s in environment.states:
                     self.__qtable[s] = {}
@@ -807,6 +814,14 @@ class Agent(arcade.Sprite):
 
     def _set_qtable(self, qtable):
         self.__qtable = qtable
+
+    def _get_agent_number(self):
+        return self.__agent_number
+
+    def _set_agent_number(self, agent_number):
+        self.__agent_number = agent_number
+
+    agent_number = property(_get_agent_number, _set_agent_number)
 
     qtable = property(_get_qtable, _set_qtable)
 
