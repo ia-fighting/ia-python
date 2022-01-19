@@ -40,6 +40,7 @@ PLT_GENERATION_NUMBER = []
 
 PLAYER_1 = '1'
 PLAYER_2 = '2'
+PLAYER_1_HAS_PRIORITY = True
 
 """
 Platformer Game
@@ -144,6 +145,7 @@ class MyGame(arcade.Window):
         self.ia_env = GameEnvironment(ARENA)
         # initialize AgentManager
         self.ia_am = AgentManager(self.ia_env, 2, MAX_HP)
+
         SCORE_TABLES_EVOLUTIONS[0] = []
         SCORE_TABLES_EVOLUTIONS[1] = []
         self.scene = None
@@ -288,7 +290,16 @@ class MyGame(arcade.Window):
             self.setup()
 
         if key == arcade.key.I:
-            self.load_inverse_qtable(self.ia_am.agents)
+            self.load_qtable(self.ia_am.agents, "I")
+        if key == arcade.key.NUM_0:
+            self.load_qtable(self.ia_am.agents, "0")
+        if key == arcade.key.NUM_1:
+            self.load_qtable(self.ia_am.agents, "1")
+        if key == arcade.key.NUM_2:
+            self.load_qtable(self.ia_am.agents, "2")
+
+        if key == arcade.key.P:
+            self.ia_am.player_1_priority = not self.ia_am.player_1_priority
 
     def toggle_music(self, event):
         if self.active_ambiance:
@@ -418,9 +429,19 @@ class MyGame(arcade.Window):
         for i in range(len(agents)):
             agents[i].save_qtable(f"../qtable_agent_{i}")
 
-    def load_inverse_qtable(self, agents):
-        for i in range(len(agents)):
-            agents[i].load_qtable('../qtable_agent_' + str((agents[i].agent_number + 1) % 2))
+    def load_qtable(self, agents, key):
+        if(key == "I"):
+            for i in range(len(agents)):
+                agents[i].load_qtable('../qtable_agent_' + str((agents[i].agent_number + 1) % 2))
+        if(key == "0"):
+            for i in range(len(agents)):
+                agents[i].load_qtable('../qtable_agent_' + str(agents[i].agent_number))
+        if (key == "1"):
+            for i in range(len(agents)):
+                agents[i].load_qtable('../qtable_agent_' + str(agents[0].agent_number))
+        if (key == "0"):
+            for i in range(len(agents)):
+                agents[i].load_qtable('../qtable_agent_' + str(agents[1].agent_number))
 
     def update_health_bar(self, player_sprite):
         if MAX_HP > player_sprite.health >= 0 and player_sprite.is_touched:
@@ -885,6 +906,7 @@ class AgentManager:
     def __init__(self, environment, population, health):
         self.__environment = environment
         self.__population = population
+        self.__player_1_has_priority = PLAYER_1_HAS_PRIORITY
         self.__health = health
         self.__agents = []
         self.set_new_agents()
@@ -933,6 +955,14 @@ class AgentManager:
         # for each agent, reset the health and the state
         self.set_new_agents()
 
+    def _get_player_1_has_priority(self):
+        return self.__player_1_has_priority
+
+    def _set_player_1_has_priority(self, value):
+        self.__player_1_has_priority = value
+
+    player_1_priority = property(_get_player_1_has_priority, _set_player_1_has_priority)
+
     # get all alive agents
     @property
     def get_alive_agents(self):
@@ -959,17 +989,30 @@ class AgentManager:
 
     def apply_actions(self, agents):
         # Apply moving actions
-        for i in range(len(agents)):
-            agent = agents[i]
-            actual_action = agent.actual_action
-            if actual_action in MOVING_ACTIONS:
-                self.__environment.apply(agents[i], self.get_opponent(agents[i]))
-        # Apply others actions
-        for i in range(len(agents)):
-            agent = agents[i]
-            actual_action = agent.actual_action
-            if actual_action not in MOVING_ACTIONS and actual_action is not None:
-                self.__environment.apply(agent, self.get_opponent(agents[i]))
+        if self.player_1_priority:
+            for i in range(len(agents)):
+                agent = agents[i]
+                actual_action = agent.actual_action
+                if actual_action in MOVING_ACTIONS:
+                    self.__environment.apply(agents[i], self.get_opponent(agents[i]))
+            # Apply others actions
+            for i in range(len(agents)):
+                agent = agents[i]
+                actual_action = agent.actual_action
+                if actual_action not in MOVING_ACTIONS and actual_action is not None:
+                    self.__environment.apply(agent, self.get_opponent(agents[i]))
+        else:
+            for i in range(len(agents)):
+                agent = agents[(i+1) % 2]
+                actual_action = agent.actual_action
+                if actual_action in MOVING_ACTIONS:
+                    self.__environment.apply(agents[(i+1) % 2], self.get_opponent(agents[(i+1) % 2]))
+            # Apply others actions
+            for i in range(len(agents)):
+                agent = agents[(i+1) % 2]
+                actual_action = agent.actual_action
+                if actual_action not in MOVING_ACTIONS and actual_action is not None:
+                    self.__environment.apply(agent, self.get_opponent(agents[(i+1) % 2]))
 
     def display(self, generation, iteration, width):
         os.system('cls')
