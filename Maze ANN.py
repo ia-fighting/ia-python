@@ -1,7 +1,9 @@
+import matplotlib.pyplot as plt
 from random import *
 import arcade
 import pickle
 import os
+from sklearn.neural_network import MLPRegressor
 
 SPRITE_SIZE = 64
 
@@ -97,48 +99,90 @@ class Environment:
 class Agent:
     def __init__(self, environment):
         self.__environment = environment
-        self.__qtable = {}
+        #self.__qtable = {}
+        
         self.__learning_rate = 1
+
+        self.__mlp = MLPRegressor(hidden_layer_sizes=(10,),
+                                  solver='sgd',
+                                  max_iter=1,
+                                  #sinon n'apprendra qu'un seul type d'actions
+                                  warm_start=True,
+                                  learning_rate_init=self.__learning_rate)
+        self.__mlp.fit([[0, 0]], [[0] * len(ACTIONS)]) #initialisation du RN1
+
         self.__discount_factor = 1
-        for s in environment.states:
-            self.__qtable[s] = {}
-            for a in ACTIONS:
-                self.__qtable[s][a] = random() * 10.0
+        #for s in environment.states:
+        #    self.__qtable[s] = {}
+        #    for a in ACTIONS:
+        #        self.__qtable[s][a] = random() * 10.0
+        self.__history = []
+        self.__exploration = 1.0
         self.reset()
 
     def save(self, filename):
         with open(filename, 'wb') as file:
-            pickle.dump(self.__qtable, file)
+            pickle.dump(self.__mlp, file)
 
     def load(self, filename):
         with open(filename, 'rb') as file:
-            self.__qtable = pickle.load(file)            
+            self.__mlp = pickle.load(file)
 
     def reset(self):
         self.__state = self.__environment.start
         self.__score = 0
         self.__last_action = None
 
+    def update_history(self):
+        self.__history.append(self.__score)
+
+    @property
+    def history(self):
+        return self.__history
+
     def update(self, action, state, reward):
-        #update q-table
-        #Q(st, a) <- Q(st, a) + learning_rate *
-        #                       [reward + discount_factor * max(qtable[st+1]) - Q(st, a)]
-        maxQ = max(self.__qtable[state].values())
-        self.__qtable[self.__state][action] += self.__learning_rate * \
-                                (reward + self.__discount_factor * \
-                                 maxQ - self.__qtable[self.__state][action])
-        
+        #maxQ = max(self.__qtable[state].values())
+        #self.__qtable[self.__state][action] += self.__learning_rate * \
+        #                        (reward + self.__discount_factor * \
+        #                         maxQ - self.__qtable[self.__state][action])
+        #
+        maxQ = max(self.__mlp.predict([self.state_to_vector(state)])[0])
+        desired = reward + self.__discount_factor * maxQ
+
+        qvector = self.__mlp.predict([self.state_to_vector(self.__state)])[0]
+        i_action = ACTIONS.index(action)
+        qvector[i_action] = desired
+
+        self.__mlp.fit([self.state_to_vector(self.__state)], [qvector])
         self.__state = state
         self.__score += reward
         self.__last_action = action
 
+    def state_to_vector(self, state):
+        return [state[0] / self.__environment.width, state[1] / self.__environment.height]
+
     def best_action(self):
-        rewards = self.__qtable[self.__state]
-        best = None
-        for a in rewards:
-            if best is None or rewards[a] > rewards[best]:
-                best = a
+        #rewards = self.__qtable[self.__state]
+
+
+        if random() < self.__exploration:
+            best = choice(ACTIONS) #une action au hasard
+            self.__exploration *= 0.99
+            print(self.__exploration)
+        else:
+            qvector = self.__mlp.predict([self.state_to_vector(self.__state)])[0]
+            #[[0.5, 0.3, 0.2, 0.1]]
+            i_best = 0
+            for i in range(len(qvector)):
+                if qvector[i] > qvector[i_best]:
+                    i_best = i
+            best = ACTIONS[i_best]
+        
         return best
+
+    @property
+    def exploration(self):
+        return self.__exploration
 
     def do(self, action):
         self.__environment.apply(self, action)
@@ -197,6 +241,9 @@ class MazeWindow(arcade.Window):
         self.player.draw()
         arcade.draw_text(f"#{self.__iteration} Score : {self.__agent.score}",
                          10, 10, arcade.csscolor.WHITE, 20)
+        print(self.__agent.exploration)
+        #arcade.draw_text(f"#{self.agent.exploration}",
+        #                 10, 20, arcade.csscolor.WHITE, 20)
 
     def on_update(self, delta_time):
         #boucle d'apprentissage et d'action
@@ -207,6 +254,7 @@ class MazeWindow(arcade.Window):
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.R:
+            self.__agent.update_history()
             self.__agent.reset()
             self.__iteration += 1
             #on réinitialise l'agent (pas sa Q-table !)
@@ -217,10 +265,14 @@ if __name__ == "__main__":
     env = Environment(MAZE)
     agent = Agent(env)
     if os.path.exists(agent_filename):
-        agent.load(agent_filename)
+        pass
+        #agent.load(agent_filename)
     
     window = MazeWindow(agent)
     window.setup()
     arcade.run()
 
     agent.save(agent_filename)
+
+    plt.plot(agent.history)
+    plt.show()

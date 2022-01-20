@@ -10,6 +10,7 @@ P = Exchange Action Priority between the players
 
 pip install arcade
 pip install pyautogui
+pip install scikit-learn
 
 ## Authors
 * [Pinklady01](https://github.com/Pinklady01)
