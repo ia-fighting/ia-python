@@ -102,9 +102,12 @@ class Agent:
         #self.__qtable = {}
 
         #learning rate to 1 => overflow
+        #for linear like identity => choose a lr of 0.001 at least
+        #if overflows => change the rewards
         self.__learning_rate = 0.01
 
         self.__mlp = MLPRegressor(hidden_layer_sizes=(10,),
+                                  #sigmoid
                                   activation='logistic',
                                   solver='sgd',
                                   max_iter=1,
