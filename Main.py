@@ -5,7 +5,6 @@ import arcade
 import matplotlib.pyplot as plt
 from arcade.gui import UIManager
 
-from Agent import Agent
 from AgentManager import AgentManager
 from GameEnvironement import *
 
@@ -326,7 +325,6 @@ class MyGame(arcade.Window):
         else:
             PLT_GENERATION_NUMBER.append(self.__generation_counter)
             for i in range(len(self.ia_am.agents)):
-                #print(f"Generation {PLT_GENERATION_NUMBER} - Agent {i} score: {self.ia_am.agents[i].score}")
                 SCORE_TABLES_EVOLUTIONS[i].append(self.ia_am.agents[i].score)
             self.ia_am.reset()
             self.setup()
@@ -366,10 +364,6 @@ class MyGame(arcade.Window):
 
     def update_action_animation(self, is_beginning, player_sprite):
         if is_beginning:
-            """if key == arcade.key.Z and player_sprite.is_alive:
-                if player_sprite.can_jump():
-                    player_sprite.change_y = PLAYER_JUMP_SPEED
-                    arcade.play_sound(self.jump_sound)"""
             if player_sprite.last_action == LEFT and self.player_one_sprite.is_alive:
                 player_sprite.__change_x = -PLAYER_MOVEMENT_SPEED
                 player_sprite.__is_walking = True
@@ -380,8 +374,6 @@ class MyGame(arcade.Window):
                 player_sprite.character_face_direction = RIGHT_FACING
             elif player_sprite.last_action == BLOCK and player_sprite.is_alive:
                 player_sprite.__is_blocking = True
-            """elif agent.last_action == PUNCH and player_sprite.is_alive:
-                player_sprite.attack(player_sprite, self.attack_sound, self.hit_sound, self.block_sound)"""
         else:
             if player_sprite.last_action == LEFT:
                 player_sprite.__change_x = 0
