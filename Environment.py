@@ -1,0 +1,75 @@
+ARENA = """#  *      *     #"""
+
+PLAYER = '*'
+WALL = '#'
+
+# Rewards
+REWARD_OUT = -25
+REWARD_EMPTY = -1
+REWARD_BLOCK = -5
+REWARD_BLOCK_ATTACK = 25
+REWARD_WOUND_TARGET = 30
+REWARD_KILL_TARGET = 100
+REWARD_DEATH = -100
+REWARD_BEING_TOUCH = -20
+REWARD_TOUCH_BLOCKING_TARGET = -2
+REWARD_TOUCH_EMPTY = -4
+
+# Possibles actions
+RIGHT = 'R'
+LEFT = 'L'
+PUNCH = 'P'
+BLOCK = 'B'
+ACTIONS = [RIGHT, LEFT, PUNCH, BLOCK]
+MOVING_ACTIONS = [RIGHT, LEFT]
+
+# Q_Table evolution of agents in hashmap
+SCORE_TABLES_EVOLUTIONS = {}
+PLT_GENERATION_NUMBER = []
+
+PLAYER_1 = '1'
+PLAYER_2 = '2'
+PLAYER_1_HAS_PRIORITY = True
+
+"""
+Platformer Game
+"""
+
+SCREEN_WIDTH = 1000
+SCREEN_HEIGHT = 650
+SCREEN_TITLE = "ZOMBIE FIGHTING"
+
+# Constants used to scale our sprites from their original size
+TILE_SCALING = 0.5
+
+SPRITE_PIXEL_SIZE = 128
+GRID_PIXEL_SIZE = SPRITE_PIXEL_SIZE * TILE_SCALING
+
+# Movement speed of player, in pixels per frame
+PLAYER_MOVEMENT_SPEED = 7
+GRAVITY = 2
+PLAYER_JUMP_SPEED = 30
+
+PLAYER_ONE_START_Y = SPRITE_PIXEL_SIZE * TILE_SCALING * 3
+
+PLAYER_START_X = SPRITE_PIXEL_SIZE * TILE_SCALING
+PLAYER_TWO_START_Y = SPRITE_PIXEL_SIZE * TILE_SCALING * 3
+
+MAX_HP = 10
+
+# Constants used to track if the player is facing left or right
+RIGHT_FACING = 0
+LEFT_FACING = 1
+
+LAYER_NAME_LADDERS = "Ladders"
+LAYER_NAME_PLAYER_ONE = "PlayerOne"
+LAYER_NAME_PLAYER_TWO = "PlayerTwo"
+
+SPRITES_PATH = "../core/asset/sprites/png/"
+
+
+# Load sounds
+SOUNDS_PATH = "../core/asset/sounds/"
+
+CHARACTER_SCALING = 0.3
+MAIN_PATH = f"../core/asset/sprites/png/"
