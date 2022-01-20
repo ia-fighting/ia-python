@@ -100,10 +100,12 @@ class Agent:
     def __init__(self, environment):
         self.__environment = environment
         #self.__qtable = {}
-        
-        self.__learning_rate = 1
+
+        #learning rate to 1 => overflow
+        self.__learning_rate = 0.01
 
         self.__mlp = MLPRegressor(hidden_layer_sizes=(10,),
+                                  activation='logistic',
                                   solver='sgd',
                                   max_iter=1,
                                   #sinon n'apprendra qu'un seul type d'actions
@@ -163,7 +165,6 @@ class Agent:
 
     def best_action(self):
         #rewards = self.__qtable[self.__state]
-
 
         if random() < self.__exploration:
             best = choice(ACTIONS) #une action au hasard
