@@ -66,7 +66,6 @@ class Agent(arcade.Sprite):
         self.idle_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Idle1.png")
         self.jump_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Dead3.png")
         self.fall_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Idle1.png")
-        self.block_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Block.png")
 
         # Set up sprites animations for the agent
         self.set_up_agent_sprites()
@@ -95,7 +94,7 @@ class Agent(arcade.Sprite):
 
         # Load textures for attacking
         for i in range(1, 8):
-            attack_texture = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/prout.png")
+            attack_texture = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Attack{i}.png")
             self.attack_textures.append(attack_texture)
 
         for i in range(1, 16):
@@ -186,11 +185,6 @@ class Agent(arcade.Sprite):
             self.texture = self.fall_texture_pair[self.character_face_direction]
             return
 
-        # Block animation
-        if self.__is_blocking:
-            self.texture = self.block_texture_pair[self.character_face_direction]
-            return
-
         # Attacking animation
         if self.__is_attacking and self.__change_x == 0:
             self.__cur_attack_texture = 0
@@ -279,6 +273,23 @@ class Agent(arcade.Sprite):
         self.__is_alive = is_alive
 
     is_alive = property(_get_is_alive, _set_is_alive)
+
+
+    def _set_is_attacking(self, is_attacking):
+        self.__is_attacking = is_attacking
+
+    def _get_is_attacking(self):
+        return self.__is_attacking
+
+    is_attacking = property(_get_is_attacking, _set_is_attacking)
+
+    def _set_is_blocking(self, is_blocking):
+        self.__is_blocking = is_blocking
+
+    def _get_is_blocking(self):
+        return self.__is_blocking
+
+    is_blocking = property(_get_is_blocking, _set_is_blocking)
 
     def _get_health_bar(self):
         return self.__health_bar

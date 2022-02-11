@@ -1,3 +1,5 @@
+import arcade
+
 from core.utils.Singleton import Singleton
 from Environment import *
 

@@ -153,6 +153,22 @@ class MyGame(arcade.Window):
         player_two_preview.position = coordinate_player_two_preview
         self.wall_list.append(player_two_preview)
 
+        # Create attack effects
+        self.player_one_prout = arcade.Sprite(f"{SPRITES_PATH}/male/prout.png", 0.8)
+        self.player_one_prout.position = [-100, -100]
+        self.player_one_prout.alpha = 230
+        self.player_two_prout = arcade.Sprite(f"{SPRITES_PATH}/female/prout.png", 0.5)
+        self.player_two_prout.position = [-100, -100]
+        self.player_two_prout.alpha = 230
+
+        # Create block effects
+        self.player_one_block = arcade.Sprite(f"{SPRITES_PATH}/male/Block.png")
+        self.player_one_block.position = [-100, -100]
+        self.player_one_block.alpha = 160
+        self.player_two_block = arcade.Sprite(f"{SPRITES_PATH}/female/Block.png", 0.8)
+        self.player_two_block.position = [-100, -100]
+        self.player_two_block.alpha = 160
+
         for i in range(1, self.player_one_sprite.health + 1):
             coordinate_heart = [60 + i * 30, 600]
             heart = arcade.Sprite(f"{SPRITES_PATH}/objects/heart.png", 0.05)
@@ -239,6 +255,10 @@ class MyGame(arcade.Window):
 
         # Draw our Scene
         self.scene.draw()
+        self.player_one_prout.draw()
+        self.player_two_prout.draw()
+        self.player_one_block.draw()
+        self.player_two_block.draw()
         self.bone.draw()
         self.ui_manager.draw()
 
@@ -294,6 +314,22 @@ class MyGame(arcade.Window):
         # Remove heart
         self.player_one_sprite = self.ia_am.agents[0]
         self.player_two_sprite = self.ia_am.agents[1]
+
+        if self.player_one_sprite.is_attacking:
+            self.player_one_prout.position = self.player_one_sprite.position
+            self.player_one_prout.draw()
+
+        if self.player_two_sprite.is_attacking:
+            self.player_two_prout.position = self.player_two_sprite.position
+            self.player_two_prout.draw()
+
+        if self.player_one_sprite.is_blocking:
+            self.player_one_block.position = self.player_one_sprite.position
+            self.player_one_block.draw()
+
+        if self.player_two_sprite.is_blocking:
+            self.player_two_block.position = self.player_two_sprite.position
+            self.player_two_block.draw()
 
         self.update_health_bar(self.player_one_sprite)
         self.update_health_bar(self.player_two_sprite)
