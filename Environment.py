@@ -65,11 +65,11 @@ LAYER_NAME_LADDERS = "Ladders"
 LAYER_NAME_PLAYER_ONE = "PlayerOne"
 LAYER_NAME_PLAYER_TWO = "PlayerTwo"
 
-SPRITES_PATH = "../core/asset/sprites/png/"
+SPRITES_PATH = "./core/asset/sprites/png/"
 
 
 # Load sounds
-SOUNDS_PATH = "../core/asset/sounds/"
+SOUNDS_PATH = "./core/asset/sounds/"
 
 CHARACTER_SCALING = 0.3
-MAIN_PATH = f"../core/asset/sprites/png/"
+MAIN_PATH = f"./core/asset/sprites/png/"
