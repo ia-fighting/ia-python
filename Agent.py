@@ -66,7 +66,7 @@ class Agent(arcade.Sprite):
         self.idle_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Idle1.png")
         self.jump_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Dead3.png")
         self.fall_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Idle1.png")
-        self.block_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Dead1.png")
+        self.block_texture_pair = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Block.png")
 
         # Set up sprites animations for the agent
         self.set_up_agent_sprites()
@@ -95,7 +95,7 @@ class Agent(arcade.Sprite):
 
         # Load textures for attacking
         for i in range(1, 8):
-            attack_texture = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/Attack{i}.png")
+            attack_texture = load_texture_pair(f"{MAIN_PATH}{self.__sprites}/prout.png")
             self.attack_textures.append(attack_texture)
 
         for i in range(1, 16):
